@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "type": "antenatal",
+    "title": "Antenatal Clinic Visit",
+    "description": "Prepare for your antenatal clinic visit.",
+    "checklist_items": [
+      "Carry your ANC card or any previous hospital record.",
+      "Have a small bottle of water and a light snack.",
+      "Note down any unusual symptoms to mention to the nurse.",
+      "Arrange transport to and from the clinic."
+    ]
+  },
+  {
+    "id": 2,
+    "type": "child_immunization",
+    "title": "Child Immunization Visit",
+    "description": "Things to prepare when taking your child for immunization.",
+    "checklist_items": [
+      "Bring your child’s clinic card.",
+      "Dress the child in easy-to-remove clothing.",
+      "Carry a light snack or toy to calm the child.",
+      "Have some cash or health insurance card ready."
+    ]
+  }
+]

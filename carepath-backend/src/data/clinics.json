@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "Central Community Clinic",
+    "address": "Main Road, Village A",
+    "area": "Village A",
+    "latitude": 6.5001,
+    "longitude": 3.2001,
+    "opening_hours": "Mon–Fri: 8:00–16:00",
+    "services": ["general", "antenatal", "immunization"],
+    "is_public": true
+  },
+  {
+    "id": 2,
+    "name": "Ward B Primary Health Center",
+    "address": "Ward B, Town X",
+    "area": "Town X",
+    "latitude": 6.5002,
+    "longitude": 3.2005,
+    "opening_hours": "Mon–Sat: 8:00–18:00",
+    "services": ["general", "malaria", "immunization"],
+    "is_public": true
+  }
+]
