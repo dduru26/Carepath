@@ -1,4 +1,3 @@
-// src/pages/ClinicFinder.jsx
 import { useState } from 'react';
 import api from '../api/client';
 import ClinicCard from '../components/ClinicCard';
@@ -21,18 +20,21 @@ function ClinicFinder() {
 
       const params = {};
 
+      // manual area
       if (!options.useGps && area) {
         params.area = area;
       }
 
+      // service filter
       if (service) {
         params.service = service;
       }
 
+      // gps-based
       if (options.useGps && options.coords) {
         params.lat = options.coords.latitude;
         params.lng = options.coords.longitude;
-        params.radiusKm = 10; // adjust as needed
+        params.radiusKm = 10; // tweak radius as needed
       }
 
       const res = await api.get('/clinics', { params });
@@ -115,9 +117,7 @@ function ClinicFinder() {
       </form>
 
       <div style={{ margin: '1rem 0' }}>
-        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-          Or:
-        </p>
+        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Or:</p>
         <button
           type="button"
           className="secondary-btn"

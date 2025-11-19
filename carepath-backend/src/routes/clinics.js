@@ -1,4 +1,3 @@
-// src/routes/clinics.js
 const express = require('express');
 const router = express.Router();
 const clinics = require('../data/clinics.json');

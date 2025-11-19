@@ -27,6 +27,7 @@ function Layout({ children }) {
         <Link to="/">Home</Link>
         <Link to="/clinics">Find a clinic</Link>
         <Link to="/visit-guides">Prepare for a visit</Link>
+        <Link to="/reminders">Reminders</Link>
       </nav>
 
       <main className="app-main">{children}</main>

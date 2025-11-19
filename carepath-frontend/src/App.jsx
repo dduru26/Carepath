@@ -6,6 +6,7 @@ import ClinicFinder from './pages/ClinicFinder';
 import ClinicDetails from './pages/ClinicDetails';
 import VisitGuides from './pages/VisitGuides';
 import VisitGuideDetails from './pages/VisitGuideDetails';
+import Reminders from './pages/Reminders';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/clinics/:id" element={<ClinicDetails />} />
         <Route path="/visit-guides" element={<VisitGuides />} />
         <Route path="/visit-guides/:id" element={<VisitGuideDetails />} />
+        <Route path="/reminders" element={<Reminders />} />
       </Routes>
     </Layout>
   );
