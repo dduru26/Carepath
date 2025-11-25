@@ -1,62 +1,61 @@
+// src/hooks/useUserProfile.js
 import { useState, useEffect } from 'react';
+import api from '../api/client'; // axios instance (baseURL: http://localhost:4000/api)
 
 /**
  * useUserProfile hook
- * - Loads the current user's profile on mount
- * - Provides updateProfile(updates) which saves and returns the updated profile
- * - Exposes saving and error states
+ * - Loads profile from localStorage on mount
+ * - Saves profile by posting to /api/users
+ * - Returns { profile, updateProfile, saving, error }
  */
 export default function useUserProfile() {
   const [profile, setProfile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Load profile from localStorage once
   useEffect(() => {
-    let mounted = true;
-
-    const loadProfile = async () => {
+    const stored = localStorage.getItem('carepathUserProfile');
+    if (stored) {
       try {
-        setError('');
-        const res = await fetch('/api/profile', { credentials: 'include' });
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || 'Failed to load profile');
-        }
-        const data = await res.json();
-        if (mounted) setProfile(data);
-      } catch (err) {
-        if (mounted) setError(err.message || 'Unable to load profile');
+        setProfile(JSON.parse(stored));
+      } catch {
+        // Ignore invalid JSON
       }
-    };
-
-    loadProfile();
-    return () => {
-      mounted = false;
-    };
+    }
   }, []);
 
   const updateProfile = async (updates) => {
     setSaving(true);
     setError('');
+
     try {
-      const res = await fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates),
+      // Call REAL backend route: POST /api/users
+      const res = await api.post('/users', updates);
+      const user = res.data;
+
+      // Save user locally (so reminders know userId)
+      localStorage.setItem(
+        'carepathUserProfile',
+        JSON.stringify({
+          userId: user.id,
+          phoneNumber: user.phoneNumber,
+          channel: user.channel,
+          language: user.language
+        })
+      );
+
+      setProfile({
+        userId: user.id,
+        phoneNumber: user.phoneNumber,
+        channel: user.channel,
+        language: user.language
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || 'Failed to save profile');
-      }
-
-      const data = await res.json();
-      // Merge returned data into local profile state
-      setProfile(prev => ({ ...(prev || {}), ...data }));
-      return data;
+      return user;
     } catch (err) {
-      setError(err.message || 'Unable to save profile');
+      console.error(err);
+      setError('Unable to save profile. Please try again.');
       throw err;
     } finally {
       setSaving(false);

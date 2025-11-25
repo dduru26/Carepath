@@ -1,27 +1,38 @@
+// src/pages/Reminders.jsx
 import { useEffect, useState } from 'react';
 import useUserProfile from '../hooks/useUserprofile';
 import { getReminders } from '../api/reminders';
 
 function Reminders() {
-  const { profile, updateProfile, saving, error: profileError } = useUserProfile();
-  const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber || '');
-  const [channel, setChannel] = useState(profile?.channel || 'sms');
-  const [language, setLanguage] = useState(profile?.language || 'en');
+  const {
+    profile,
+    updateProfile,
+    saving,
+    error: profileError
+  } = useUserProfile();
+
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [channel, setChannel] = useState('sms');
+  const [language, setLanguage] = useState('en');
 
   const [reminders, setReminders] = useState([]);
   const [loadingReminders, setLoadingReminders] = useState(false);
   const [remindersError, setRemindersError] = useState('');
+  const [message, setMessage] = useState('');
 
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    try {
-      const updated = await updateProfile({ phoneNumber, channel, language });
-      // After saving profile, load reminders
-      loadReminders(updated.userId);
-    } catch (err) {
-      // already handled in hook
+  // When profile loads/changes, sync form + load reminders
+  useEffect(() => {
+    if (profile) {
+      setPhoneNumber(profile.phoneNumber || '');
+      setChannel(profile.channel || 'sms');
+      setLanguage(profile.language || 'en');
+
+      if (profile.userId) {
+        loadReminders(profile.userId);
+      }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.userId]);
 
   const loadReminders = async (userId) => {
     if (!userId) return;
@@ -38,16 +49,31 @@ function Reminders() {
     }
   };
 
-  useEffect(() => {
-    if (profile?.userId) {
-      loadReminders(profile.userId);
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    try {
+      const user = await updateProfile({
+        phoneNumber,
+        channel,
+        language
+      });
+      setMessage('Profile saved successfully.');
+      // user.id is the backend user id; profile in hook already updated
+      if (user && user.id) {
+        await loadReminders(user.id);
+      }
+    } catch (err) {
+      // error message already handled in hook as profileError
     }
-  }, [profile?.userId]);
+  };
 
   return (
     <section>
       <h2>Reminders & Profile</h2>
-      <p>Save your phone number and how you’d like to receive reminders.</p>
+      <p style={{ fontSize: '0.9rem' }}>
+        Save your phone number and how you’d like to receive reminders.
+      </p>
 
       <form onSubmit={handleSaveProfile} className="form">
         <label>
@@ -63,7 +89,10 @@ function Reminders() {
 
         <label>
           Channel
-          <select value={channel} onChange={e => setChannel(e.target.value)}>
+          <select
+            value={channel}
+            onChange={e => setChannel(e.target.value)}
+          >
             <option value="sms">SMS</option>
             <option value="whatsapp">WhatsApp</option>
           </select>
@@ -71,14 +100,32 @@ function Reminders() {
 
         <label>
           Language (optional)
-          <select value={language} onChange={e => setLanguage(e.target.value)}>
+          <select
+            value={language}
+            onChange={e => setLanguage(e.target.value)}
+          >
             <option value="en">English</option>
+            {/* Future: add more languages here */}
           </select>
         </label>
 
-        {profileError && <p className="error">{profileError}</p>}
+        {profileError && (
+          <p className="error" style={{ marginTop: '0.5rem' }}>
+            {profileError}
+          </p>
+        )}
 
-        <button type="submit" className="primary-btn" disabled={saving}>
+        {message && !profileError && (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+            {message}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          className="primary-btn"
+          disabled={saving}
+        >
           {saving ? 'Saving...' : 'Save profile'}
         </button>
       </form>
@@ -86,20 +133,31 @@ function Reminders() {
       <hr style={{ margin: '1.5rem 0' }} />
 
       <h3>Your reminders</h3>
-      {loadingReminders && <p>Loading reminders...</p>}
-      {remindersError && <p className="error">{remindersError}</p>}
 
-      {reminders.length === 0 && !loadingReminders && (
+      {loadingReminders && <p>Loading reminders...</p>}
+      {remindersError && (
+        <p className="error">{remindersError}</p>
+      )}
+
+      {!loadingReminders && reminders.length === 0 && (
         <p>No reminders yet. Set one from a clinic page.</p>
       )}
 
       <ul className="list">
         {reminders.map(r => (
           <li key={r.id} className="card">
-            <p><strong>Type:</strong> {r.type}</p>
-            <p><strong>When:</strong> {new Date(r.scheduledAt).toLocaleString()}</p>
-            <p><strong>Message:</strong> {r.message}</p>
-            <p><strong>Status:</strong> {r.status}</p>
+            <p>
+              <strong>Type:</strong> {r.type}
+            </p>
+            <p>
+              <strong>When:</strong>{' '}
+              {new Date(r.scheduledAt).toLocaleString()}
+            </p>
+            <p>
+              <strong>Message:</strong> {r.message}
+            </p>
+            <p>
+              <strong>Status:</strong> {r.status}</p>
           </li>
         ))}
       </ul>

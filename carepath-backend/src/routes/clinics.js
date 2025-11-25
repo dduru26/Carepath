@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const clinics = require('../data/clinics.json');
+const {
+  getAllClinics,
+  getClinicById,
+  createClinic,
+  updateClinic,
+  deleteClinic
+} = require('../models/clinicStore');
 
-// Helper: Haversine distance in km between two points
+// Haversine
 function distanceInKm(lat1, lon1, lat2, lon2) {
   const toRad = value => (value * Math.PI) / 180;
-  const R = 6371; // Earth radius in km
+  const R = 6371;
 
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -20,17 +26,12 @@ function distanceInKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// GET /api/clinics
-// Supports:
-// - ?area=Village A
-// - ?service=antenatal
-// - ?lat=6.5&lng=3.2&radiusKm=10
+// GET /api/clinics (search)
 router.get('/', (req, res) => {
   const { area, service, lat, lng, radiusKm } = req.query;
 
-  let result = clinics;
+  let result = getAllClinics();
 
-  // Manual area/town filtering
   if (area) {
     const areaLower = area.toLowerCase();
     result = result.filter(c =>
@@ -39,7 +40,6 @@ router.get('/', (req, res) => {
     );
   }
 
-  // Service filtering
   if (service) {
     const sLower = service.toLowerCase();
     result = result.filter(c =>
@@ -47,7 +47,6 @@ router.get('/', (req, res) => {
     );
   }
 
-  // Optional GPS / radius filtering
   if (lat && lng && radiusKm) {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
@@ -67,14 +66,38 @@ router.get('/', (req, res) => {
 
 // GET /api/clinics/:id
 router.get('/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const clinic = clinics.find(c => c.id === id);
-
+  const clinic = getClinicById(req.params.id);
   if (!clinic) {
     return res.status(404).json({ error: 'Clinic not found' });
   }
-
   res.json(clinic);
+});
+
+// ADMIN: POST /api/clinics
+router.post('/', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+
+  const clinic = createClinic(req.body);
+  res.status(201).json(clinic);
+});
+
+// ADMIN: PUT /api/clinics/:id
+router.put('/:id', (req, res) => {
+  const updated = updateClinic(req.params.id, req.body);
+  if (!updated) {
+    return res.status(404).json({ error: 'Clinic not found' });
+  }
+  res.json(updated);
+});
+
+// ADMIN: DELETE /api/clinics/:id
+router.delete('/:id', (req, res) => {
+  const ok = deleteClinic(req.params.id);
+  if (!ok) {
+    return res.status(404).json({ error: 'Clinic not found' });
+  }
+  res.status(204).end();
 });
 
 module.exports = router;

@@ -1,7 +1,7 @@
 import api from './client';
 
 // Create or update user profile
-export async function saveUserProfile({ phoneNumber, channel, language }) {
+export async function saveUserprofile({ phoneNumber, channel, language }) {
   const res = await api.post('/users', { phoneNumber, channel, language });
   return res.data;
 }

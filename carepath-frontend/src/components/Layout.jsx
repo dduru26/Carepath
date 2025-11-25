@@ -28,6 +28,7 @@ function Layout({ children }) {
         <Link to="/clinics">Find a clinic</Link>
         <Link to="/visit-guides">Prepare for a visit</Link>
         <Link to="/reminders">Reminders</Link>
+        {/* <Link to="/admin">Admin</Link>  // keep commented if you want it hidden */}
       </nav>
 
       <main className="app-main">{children}</main>
