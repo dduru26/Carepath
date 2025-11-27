@@ -1,165 +1,131 @@
 // src/routes/clinics.js
 const express = require('express');
 const router = express.Router();
+const prisma = require('../prismaClient');
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+// simple haversine distance in km
+function distanceKm(lat1, lon1, lat2, lon2) {
+  function toRad(v) {
+    return (v * Math.PI) / 180;
+  }
 
-const { requireAuth, requireRole } = require('../middleware/auth');
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
 
-// Helper: convert DB clinic into API shape (services as array)
-function toApiClinic(c) {
-  if (!c) return c;
-  return {
-    ...c,
-    services: c.services
-      ? c.services.split(',').map((s) => s.trim()).filter(Boolean)
-      : [],
-  };
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
-/**
- * GET /api/clinics
- * Fetch all clinics (public)
- */
+// GET /api/clinics
+// supports:
+//  - ?area=Kigali
+//  - ?service=hospital|clinic|primary-care|general
+//  - ?lat=...&lng=...&radiusKm=10
 router.get('/', async (req, res) => {
   try {
-    const clinics = await prisma.clinic.findMany({
+    const { area, service, lat, lng, radiusKm } = req.query;
+
+    // 1. Start from all public clinics
+    let clinics = await prisma.clinic.findMany({
+      where: {
+        isPublic: true,
+      },
       orderBy: { name: 'asc' },
     });
 
-    const formatted = clinics.map(toApiClinic);
-    res.json(formatted);
+    // 2. Filter by area (case-insensitive match on area or name)
+    if (area && area.trim()) {
+      const term = area.trim().toLowerCase();
+      clinics = clinics.filter((c) => {
+        const areaStr = (c.area || '').toLowerCase();
+        const nameStr = (c.name || '').toLowerCase();
+        return areaStr.includes(term) || nameStr.includes(term);
+      });
+    }
+
+    // 3. Filter by service tag (we stored a single string in `services`)
+    if (service && service.trim()) {
+      const s = service.trim().toLowerCase();
+      clinics = clinics.filter((c) => {
+        const tag = (c.services || '').toLowerCase();
+        // either exact or contains
+        return tag === s || tag.includes(s);
+      });
+    }
+
+    // 4. Optional: filter by distance if lat/lng provided
+    let useDistance = false;
+    let centerLat = parseFloat(lat);
+    let centerLng = parseFloat(lng);
+    let radius = parseFloat(radiusKm) || 10; // default 10km
+
+    if (
+      !Number.isNaN(centerLat) &&
+      !Number.isNaN(centerLng)
+    ) {
+      useDistance = true;
+    }
+
+    if (useDistance) {
+      clinics = clinics
+        .map((c) => {
+          if (
+            typeof c.latitude === 'number' &&
+            typeof c.longitude === 'number'
+          ) {
+            const dist = distanceKm(
+              centerLat,
+              centerLng,
+              c.latitude,
+              c.longitude
+            );
+            return { ...c, distanceKm: dist };
+          }
+          return { ...c, distanceKm: null };
+        })
+        .filter(
+          (c) =>
+            c.distanceKm !== null && c.distanceKm <= radius
+        )
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+    }
+
+    res.json(clinics);
   } catch (err) {
     console.error('Error fetching clinics:', err);
-    res.status(500).json({ error: 'Unable to fetch clinics' });
+    res.status(500).json({ error: 'Unable to load clinics' });
   }
 });
 
-/**
- * GET /api/clinics/:id
- * Fetch a single clinic (public)
- */
+// GET /api/clinics/:id
 router.get('/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid clinic id' });
+    }
 
     const clinic = await prisma.clinic.findUnique({
       where: { id },
-      include: {
-        notes: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
     });
 
     if (!clinic) {
       return res.status(404).json({ error: 'Clinic not found' });
     }
 
-    const formatted = toApiClinic(clinic);
-    res.json(formatted);
+    res.json(clinic);
   } catch (err) {
-    console.error('Error fetching clinic:', err);
-    res.status(500).json({ error: 'Unable to fetch clinic' });
+    console.error('Error fetching clinic by id:', err);
+    res.status(500).json({ error: 'Unable to load clinic' });
   }
 });
-
-/**
- * POST /api/clinics
- * Create a new clinic (admin only)
- */
-router.post(
-  '/',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-    try {
-      const data = req.body;
-
-      const newClinic = await prisma.clinic.create({
-        data: {
-          name: data.name,
-          address: data.address || null,
-          area: data.area || null,
-          latitude: data.latitude || null,
-          longitude: data.longitude || null,
-          openingHours: data.openingHours || null,
-          // store as string in DB
-          services: Array.isArray(data.services)
-            ? data.services.join(',')
-            : '',
-          isPublic: data.isPublic ?? true,
-        },
-      });
-
-      res.status(201).json(toApiClinic(newClinic));
-    } catch (err) {
-      console.error('Error creating clinic:', err);
-      res.status(500).json({ error: 'Unable to create clinic' });
-    }
-  }
-);
-
-/**
- * PUT /api/clinics/:id
- * Update clinic information (admin only)
- */
-router.put(
-  '/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const data = req.body;
-
-      const updatedClinic = await prisma.clinic.update({
-        where: { id },
-        data: {
-          name: data.name,
-          address: data.address,
-          area: data.area,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          openingHours: data.openingHours,
-          services: Array.isArray(data.services)
-            ? data.services.join(',')
-            : '',
-          isPublic: data.isPublic,
-        },
-      });
-
-      res.json(toApiClinic(updatedClinic));
-    } catch (err) {
-      console.error('Error updating clinic:', err);
-      res.status(500).json({ error: 'Unable to update clinic' });
-    }
-  }
-);
-
-/**
- * DELETE /api/clinics/:id
- * Delete clinic (admin only)
- */
-router.delete(
-  '/:id',
-  requireAuth,
-  requireRole('admin'),
-  async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-
-      await prisma.clinic.delete({
-        where: { id },
-      });
-
-      res.json({ message: 'Clinic deleted' });
-    } catch (err) {
-      console.error('Error deleting clinic:', err);
-      res.status(500).json({ error: 'Unable to delete clinic' });
-    }
-  }
-);
 
 module.exports = router;

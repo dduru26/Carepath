@@ -1,0 +1,282 @@
+[
+  {
+    "name": "Avega Kigali Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9585,
+    "longitude": 30.1068,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Bethsaida Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9768,
+    "longitude": 30.1145,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Biryogo Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9669,
+    "longitude": 30.06,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Bumbogo (ex-Gikomero I) Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8871,
+    "longitude": 30.2187,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Busanza Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9801,
+    "longitude": 30.1496,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Caritas Kigali Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.952,
+    "longitude": 30.0624,
+    "type": "Health Centre"
+  },
+  {
+    "name": "CHUK (University Teaching Hospital of Kigali)",
+    "area": "Kigali City",
+    "latitude": -1.9466,
+    "longitude": 30.061,
+    "type": "Hospital"
+  },
+  {
+    "name": "CHUK Polyclinic",
+    "area": "Kigali City",
+    "latitude": -1.946,
+    "longitude": 30.0615,
+    "type": "Clinic"
+  },
+  {
+    "name": "Cor-Unum Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9628,
+    "longitude": 30.0559,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Cyaruzinge Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9103,
+    "longitude": 30.2045,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gahanga Health Centre",
+    "area": "Kigali City",
+    "latitude": -2.003,
+    "longitude": 30.1295,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gatenga Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9813,
+    "longitude": 30.0941,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gatsata Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9158,
+    "longitude": 30.0547,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gihogwe Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8867,
+    "longitude": 30.05,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gikomero Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8806,
+    "longitude": 30.2309,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gikondo Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9847,
+    "longitude": 30.0664,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Gisozi Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9206,
+    "longitude": 30.069,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Jali Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8703,
+    "longitude": 30.1525,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Juru Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9459,
+    "longitude": 30.2203,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kacyiru Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9368,
+    "longitude": 30.0777,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kabuye Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8918,
+    "longitude": 30.098,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kabuga Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.95,
+    "longitude": 30.1889,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kanombe Military Hospital",
+    "area": "Kigali City",
+    "latitude": -1.9688,
+    "longitude": 30.1395,
+    "type": "Hospital"
+  },
+  {
+    "name": "Karama (Kicukiro) Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9903,
+    "longitude": 30.1059,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kibagabaga Hospital",
+    "area": "Kigali City",
+    "latitude": -1.9354,
+    "longitude": 30.1138,
+    "type": "Hospital"
+  },
+  {
+    "name": "Kicukiro Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9698,
+    "longitude": 30.1142,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kimironko Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9396,
+    "longitude": 30.118,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kinyinya Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9192,
+    "longitude": 30.1164,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Kinyinya II Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9135,
+    "longitude": 30.142,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Masaka District Hospital",
+    "area": "Kigali City",
+    "latitude": -2.0237,
+    "longitude": 30.1561,
+    "type": "Hospital"
+  },
+  {
+    "name": "Masaka Health Centre",
+    "area": "Kigali City",
+    "latitude": -2.0169,
+    "longitude": 30.162,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Muhima District Hospital",
+    "area": "Kigali City",
+    "latitude": -1.9461,
+    "longitude": 30.0564,
+    "type": "Hospital"
+  },
+  {
+    "name": "Nderwa Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8815,
+    "longitude": 30.1798,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Nemba (Kigali) Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9168,
+    "longitude": 30.0798,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Nyamirambo Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9736,
+    "longitude": 30.0457,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Nyarugenge District Hospital",
+    "area": "Kigali City",
+    "latitude": -1.9659,
+    "longitude": 30.0606,
+    "type": "Hospital"
+  },
+  {
+    "name": "Remera Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.9554,
+    "longitude": 30.1125,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Rukoma (Gasabo) Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.8646,
+    "longitude": 30.1279,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Rubungo Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.946,
+    "longitude": 30.1738,
+    "type": "Health Centre"
+  },
+  {
+    "name": "Rugarama (Nyarugenge) Health Centre",
+    "area": "Kigali City",
+    "latitude": -1.992,
+    "longitude": 30.0434,
+    "type": "Health Centre"
+  }
+]

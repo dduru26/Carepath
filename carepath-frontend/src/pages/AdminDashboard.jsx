@@ -1,229 +1,599 @@
-import { useEffect, useState } from 'react';
-import api from '../api/client';
-import { createClinic, updateClinic, deleteClinic } from '../api/clinicsAdmin';
+// src/pages/AdminDashboard.jsx
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import {
+  fetchClinics,
+  createClinic,
+  updateClinic,
+  deleteClinic,
+} from '../api/clinics';
 
-function AdminDashboard() {
+export default function AdminDashboard() {
+  const { user } = useAuth();
+
   const [clinics, setClinics] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [loadingClinics, setLoadingClinics] = useState(true);
+  const [clinicsError, setClinicsError] = useState('');
 
-  const [form, setForm] = useState({
-    id: null,
-    name: '',
-    address: '',
-    area: '',
-    opening_hours: '',
-    services: '',
-    is_public: true
-  });
+  // Create form state
+  const [name, setName] = useState('');
+  const [area, setArea] = useState('');
+  const [servicesInput, setServicesInput] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
-  const loadClinics = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/clinics'); // same endpoint, returns all
-      setClinics(res.data);
-    } catch (err) {
-      console.error(err);
-      setError('Unable to load clinics.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Edit form state
+  const [editingClinicId, setEditingClinicId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editArea, setEditArea] = useState('');
+  const [editServicesInput, setEditServicesInput] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
+
+  // Load clinics on mount
   useEffect(() => {
-    loadClinics();
+    const load = async () => {
+      try {
+        setClinicsError('');
+        setLoadingClinics(true);
+        const data = await fetchClinics();
+        setClinics(data);
+      } catch (err) {
+        console.error('Error loading clinics in admin dashboard:', err);
+        setClinicsError('Unable to load clinics right now.');
+      } finally {
+        setLoadingClinics(false);
+      }
+    };
+
+    load();
   }, []);
 
-  const resetForm = () => {
-    setForm({
-      id: null,
-      name: '',
-      address: '',
-      area: '',
-      opening_hours: '',
-      services: '',
-      is_public: true
-    });
-  };
+  // CREATE clinic handler
+  const handleCreateClinic = async (e) => {
+    e.preventDefault();
+    setCreateError('');
+    if (!name.trim()) {
+      setCreateError('Clinic name is required.');
+      return;
+    }
 
-  const handleEdit = (clinic) => {
-    setForm({
-      id: clinic.id,
-      name: clinic.name || '',
-      address: clinic.address || '',
-      area: clinic.area || '',
-      opening_hours: clinic.opening_hours || '',
-      services: (clinic.services || []).join(', '),
-      is_public: clinic.is_public
-    });
-  };
+    const servicesArray = servicesInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  const handleDelete = async (id) => {
+    const newClinicData = {
+      name: name.trim(),
+      area: area.trim() || null,
+      services: servicesArray,
+      isPublic: true,
+    };
+
     try {
-      await deleteClinic(id);
-      await loadClinics();
+      setCreating(true);
+      const created = await createClinic(newClinicData);
+      setClinics((prev) => [created, ...prev]);
+      setName('');
+      setArea('');
+      setServicesInput('');
     } catch (err) {
-      console.error(err);
-      setError('Unable to delete clinic.');
+      console.error('Error creating clinic:', err);
+      const msg =
+        err.response?.data?.error ||
+        'Unable to create clinic. Check your rights or data.';
+      setCreateError(msg);
+    } finally {
+      setCreating(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  // When clicking "Edit" on a row
+  const startEditClinic = (clinic) => {
+    setEditingClinicId(clinic.id);
+    setEditName(clinic.name || '');
+    setEditArea(clinic.area || '');
+    const servicesList = Array.isArray(clinic.services)
+      ? clinic.services
+      : [];
+    setEditServicesInput(servicesList.join(', '));
+    setEditError('');
+  };
+
+  // Cancel edit
+  const cancelEdit = () => {
+    setEditingClinicId(null);
+    setEditName('');
+    setEditArea('');
+    setEditServicesInput('');
+    setEditError('');
+  };
+
+  // SAVE edit
+  const handleSaveClinic = async (e) => {
     e.preventDefault();
+    if (!editingClinicId) return;
+    setEditError('');
+
+    if (!editName.trim()) {
+      setEditError('Clinic name is required.');
+      return;
+    }
+
+    const servicesArray = editServicesInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const updates = {
+      name: editName.trim(),
+      area: editArea.trim() || null,
+      services: servicesArray,
+      // keep isPublic true for now
+      isPublic: true,
+    };
+
     try {
-      setSaving(true);
-      setError('');
+      setEditSaving(true);
+      const updated = await updateClinic(editingClinicId, updates);
 
-      const payload = {
-        name: form.name,
-        address: form.address,
-        area: form.area,
-        opening_hours: form.opening_hours,
-        services: form.services
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean),
-        is_public: form.is_public
-      };
+      setClinics((prev) =>
+        prev.map((c) => (c.id === editingClinicId ? updated : c))
+      );
 
-      if (form.id) {
-        await updateClinic(form.id, payload);
-      } else {
-        await createClinic(payload);
-      }
-
-      resetForm();
-      await loadClinics();
+      cancelEdit();
     } catch (err) {
-      console.error(err);
-      setError('Unable to save clinic.');
+      console.error('Error updating clinic:', err);
+      const msg =
+        err.response?.data?.error || 'Unable to save changes to this clinic.';
+      setEditError(msg);
     } finally {
-      setSaving(false);
+      setEditSaving(false);
+    }
+  };
+
+  // DELETE clinic
+  const handleDeleteClinic = async (clinicId) => {
+    const target = clinics.find((c) => c.id === clinicId);
+    const label = target ? `"${target.name}"` : 'this clinic';
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${label}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeleteBusyId(clinicId);
+      await deleteClinic(clinicId);
+      setClinics((prev) => prev.filter((c) => c.id !== clinicId));
+
+      // If we were editing this clinic, reset edit state
+      if (editingClinicId === clinicId) {
+        cancelEdit();
+      }
+    } catch (err) {
+      console.error('Error deleting clinic:', err);
+      alert(
+        err.response?.data?.error ||
+          'Unable to delete this clinic. Please try again.'
+      );
+    } finally {
+      setDeleteBusyId(null);
     }
   };
 
   return (
-    <section>
-      <h2>Admin: Clinics Management</h2>
-      <p style={{ fontSize: '0.9rem' }}>
-        This screen is for internal use only (admins/CHWs). It lets you manage clinic records.
+    <main style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto' }}>
+      <h1>Admin dashboard</h1>
+      <p style={{ marginTop: '0.5rem', fontSize: '0.95rem' }}>
+        Welcome, {user?.email || user?.phoneNumber}. Use this space to manage
+        clinics and gradually tune CarePath for your community.
       </p>
 
-      {error && <p className="error">{error}</p>}
+      {/* Create clinic form */}
+      <section
+        style={{
+          marginTop: '1.5rem',
+          padding: '1rem',
+          borderRadius: '0.75rem',
+          border: '1px solid #e5e7eb',
+          background: '#f9fafb',
+        }}
+      >
+        <h2 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+          Add a new clinic
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: '#4b5563', marginBottom: '0.75rem' }}>
+          This will immediately show up in the clinic finder for patients in the
+          matching area.
+        </p>
 
-      <form onSubmit={handleSubmit} className="form">
-        <h3>{form.id ? 'Edit clinic' : 'Add new clinic'}</h3>
-
-        <label>
-          Name
-          <input
-            type="text"
-            value={form.name}
-            onChange={e => setForm({ ...form, name: e.target.value })}
-            required
-          />
-        </label>
-
-        <label>
-          Address
-          <input
-            type="text"
-            value={form.address}
-            onChange={e => setForm({ ...form, address: e.target.value })}
-          />
-        </label>
-
-        <label>
-          Area
-          <input
-            type="text"
-            value={form.area}
-            onChange={e => setForm({ ...form, area: e.target.value })}
-          />
-        </label>
-
-        <label>
-          Opening hours
-          <input
-            type="text"
-            value={form.opening_hours}
-            onChange={e =>
-              setForm({ ...form, opening_hours: e.target.value })
-            }
-          />
-        </label>
-
-        <label>
-          Services (comma-separated)
-          <input
-            type="text"
-            value={form.services}
-            onChange={e => setForm({ ...form, services: e.target.value })}
-            placeholder="general, antenatal, immunization"
-          />
-        </label>
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <input
-            type="checkbox"
-            checked={form.is_public}
-            onChange={e => setForm({ ...form, is_public: e.target.checked })}
-          />
-          Public facility
-        </label>
-
-        <button type="submit" className="primary-btn" disabled={saving}>
-          {saving ? 'Saving...' : form.id ? 'Update clinic' : 'Create clinic'}
-        </button>
-
-        {form.id && (
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={resetForm}
-            style={{ marginLeft: '0.5rem' }}
+        {createError && (
+          <p
+            style={{
+              background: '#fee2e2',
+              color: '#b91c1c',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              marginBottom: '0.75rem',
+              fontSize: '0.85rem',
+            }}
           >
-            Cancel edit
-          </button>
+            {createError}
+          </p>
         )}
-      </form>
 
-      <hr style={{ margin: '1.5rem 0' }} />
+        <form
+          onSubmit={handleCreateClinic}
+          style={{ display: 'grid', gap: '0.75rem', maxWidth: 480 }}
+        >
+          <label style={{ display: 'grid', gap: '0.25rem' }}>
+            <span>Clinic name *</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: 6,
+                border: '1px solid #d1d5db',
+              }}
+              placeholder="e.g. Village C Primary Health Centre"
+              required
+            />
+          </label>
 
-      <h3>Existing clinics</h3>
-      {loading && <p>Loading clinics...</p>}
-      {!loading && clinics.length === 0 && <p>No clinics yet.</p>}
+          <label style={{ display: 'grid', gap: '0.25rem' }}>
+            <span>Area / Town</span>
+            <input
+              type="text"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: 6,
+                border: '1px solid #d1d5db',
+              }}
+              placeholder="e.g. Village C"
+            />
+          </label>
 
-      <ul className="list">
-        {clinics.map(c => (
-          <li key={c.id} className="card">
-            <p><strong>{c.name}</strong></p>
-            <p>{c.address}</p>
-            <p><strong>Area:</strong> {c.area}</p>
-            <p><strong>Services:</strong> {(c.services || []).join(', ')}</p>
-            <div style={{ marginTop: '0.5rem' }}>
+          <label style={{ display: 'grid', gap: '0.25rem' }}>
+            <span>Services (comma-separated)</span>
+            <input
+              type="text"
+              value={servicesInput}
+              onChange={(e) => setServicesInput(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: 6,
+                border: '1px solid #d1d5db',
+              }}
+              placeholder="e.g. general, antenatal, immunization"
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={creating}
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 999,
+              border: 'none',
+              background: creating ? '#9ca3af' : '#2563eb',
+              color: 'white',
+              fontSize: '0.9rem',
+              cursor: creating ? 'default' : 'pointer',
+              alignSelf: 'flex-start',
+            }}
+          >
+            {creating ? 'Saving…' : 'Add clinic'}
+          </button>
+        </form>
+      </section>
+
+      {/* Edit clinic panel */}
+      {editingClinicId && (
+        <section
+          style={{
+            marginTop: '1.5rem',
+            padding: '1rem',
+            borderRadius: '0.75rem',
+            border: '1px solid #bfdbfe',
+            background: '#eff6ff',
+          }}
+        >
+          <h2 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+            Edit clinic
+          </h2>
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: '#1d4ed8',
+              marginBottom: '0.75rem',
+            }}
+          >
+            You’re editing an existing clinic record. Changes will be visible to
+            patients as soon as you save.
+          </p>
+
+          {editError && (
+            <p
+              style={{
+                background: '#fee2e2',
+                color: '#b91c1c',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                marginBottom: '0.75rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              {editError}
+            </p>
+          )}
+
+          <form
+            onSubmit={handleSaveClinic}
+            style={{ display: 'grid', gap: '0.75rem', maxWidth: 480 }}
+          >
+            <label style={{ display: 'grid', gap: '0.25rem' }}>
+              <span>Clinic name *</span>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                }}
+                required
+              />
+            </label>
+
+            <label style={{ display: 'grid', gap: '0.25rem' }}>
+              <span>Area / Town</span>
+              <input
+                type="text"
+                value={editArea}
+                onChange={(e) => setEditArea(e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                }}
+              />
+            </label>
+
+            <label style={{ display: 'grid', gap: '0.25rem' }}>
+              <span>Services (comma-separated)</span>
+              <input
+                type="text"
+                value={editServicesInput}
+                onChange={(e) => setEditServicesInput(e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                }}
+              />
+            </label>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
               <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => handleEdit(c)}
+                type="submit"
+                disabled={editSaving}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: editSaving ? '#9ca3af' : '#1d4ed8',
+                  color: 'white',
+                  fontSize: '0.85rem',
+                  cursor: editSaving ? 'default' : 'pointer',
+                }}
               >
-                Edit
+                {editSaving ? 'Saving…' : 'Save changes'}
               </button>
               <button
                 type="button"
-                className="secondary-btn"
-                onClick={() => handleDelete(c.id)}
-                style={{ marginLeft: '0.5rem', backgroundColor: '#fee2e2' }}
+                onClick={cancelEdit}
+                disabled={editSaving}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: 999,
+                  border: '1px solid #d1d5db',
+                  background: 'white',
+                  fontSize: '0.85rem',
+                  cursor: editSaving ? 'default' : 'pointer',
+                }}
               >
-                Delete
+                Cancel
               </button>
             </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+          </form>
+        </section>
+      )}
+
+      {/* Clinics list */}
+      <section style={{ marginTop: '2rem' }}>
+        <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>
+          Clinics currently in the system
+        </h2>
+
+        {clinicsError && (
+          <p
+            style={{
+              background: '#fee2e2',
+              color: '#b91c1c',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              marginBottom: '0.75rem',
+              fontSize: '0.85rem',
+            }}
+          >
+            {clinicsError}
+          </p>
+        )}
+
+        {loadingClinics ? (
+          <p style={{ fontSize: '0.9rem' }}>Loading clinics…</p>
+        ) : clinics.length === 0 ? (
+          <p style={{ fontSize: '0.9rem' }}>
+            No clinics found yet. Use the form above to add your first one.
+          </p>
+        ) : (
+          <div
+            style={{
+              borderRadius: '0.75rem',
+              border: '1px solid #e5e7eb',
+              overflow: 'hidden',
+            }}
+          >
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem',
+              }}
+            >
+              <thead style={{ background: '#f3f4f6' }}>
+                <tr>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    Name
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    Area
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    Services
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    Public?
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {clinics.map((clinic) => (
+                  <tr key={clinic.id}>
+                    <td
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      {clinic.name}
+                    </td>
+                    <td
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      {clinic.area || '—'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      {Array.isArray(clinic.services)
+                        ? clinic.services.join(', ')
+                        : ''}
+                    </td>
+                    <td
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      {clinic.isPublic ? 'Yes' : 'No'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => startEditClinic(clinic)}
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: 999,
+                            border: '1px solid #d1d5db',
+                            background: 'white',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClinic(clinic.id)}
+                          disabled={deleteBusyId === clinic.id}
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: 999,
+                            border: '1px solid #fecaca',
+                            background:
+                              deleteBusyId === clinic.id ? '#fee2e2' : '#fef2f2',
+                            color: '#b91c1c',
+                            fontSize: '0.8rem',
+                            cursor:
+                              deleteBusyId === clinic.id ? 'default' : 'pointer',
+                          }}
+                        >
+                          {deleteBusyId === clinic.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
-
-export default AdminDashboard;

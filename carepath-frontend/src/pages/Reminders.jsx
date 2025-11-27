@@ -1,78 +1,84 @@
 // src/pages/Reminders.jsx
 import { useEffect, useState } from 'react';
-import useUserProfile from '../hooks/useUserprofile';
-import { getReminders } from '../api/reminders';
+import useUserProfile from '../hooks/useUserProfile';
+import api from '../api/client';
 
-function Reminders() {
+export default function Reminders() {
+  // Profile-related state via your existing hook
   const {
     profile,
     updateProfile,
-    saving,
-    error: profileError
+    saving: savingProfile,
+    error: profileError,
   } = useUserProfile();
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [channel, setChannel] = useState('sms');
-  const [language, setLanguage] = useState('en');
+  const [phone, setPhone] = useState('');
+  const [channel, setChannel] = useState('SMS');
+  const [language, setLanguage] = useState('English');
+  const [profileMessage, setProfileMessage] = useState('');
 
+  // Reminders list state
   const [reminders, setReminders] = useState([]);
-  const [loadingReminders, setLoadingReminders] = useState(false);
+  const [remindersLoading, setRemindersLoading] = useState(false);
   const [remindersError, setRemindersError] = useState('');
-  const [message, setMessage] = useState('');
 
-  // When profile loads/changes, sync form + load reminders
+  // When profile loads, hydrate the form fields
   useEffect(() => {
     if (profile) {
-      setPhoneNumber(profile.phoneNumber || '');
-      setChannel(profile.channel || 'sms');
-      setLanguage(profile.language || 'en');
+      setPhone(profile.phoneNumber || '');
+      setChannel(profile.preferredChannel || 'SMS');
+      setLanguage(profile.language || 'English');
+    }
+  }, [profile]);
 
-      if (profile.userId) {
-        loadReminders(profile.userId);
+  // Load reminders for the current user (or demo user as fallback)
+  useEffect(() => {
+    const loadReminders = async () => {
+      try {
+        setRemindersLoading(true);
+        setRemindersError('');
+
+        // 🔥 For demo: use profile.id OR fallback to userId = 1
+        const userId = profile?.id || 1;
+
+        const res = await api.get('/reminders', {
+          params: { userId },
+        });
+
+        setReminders(res.data || []);
+      } catch (err) {
+        console.error('Error loading reminders:', err);
+        setRemindersError('Unable to load reminders.');
+      } finally {
+        setRemindersLoading(false);
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.userId]);
+    };
 
-  const loadReminders = async (userId) => {
-    if (!userId) return;
-    try {
-      setLoadingReminders(true);
-      setRemindersError('');
-      const data = await getReminders(userId);
-      setReminders(data);
-    } catch (err) {
-      console.error(err);
-      setRemindersError('Unable to load reminders.');
-    } finally {
-      setLoadingReminders(false);
-    }
-  };
+    loadReminders();
+  }, [profile]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setMessage('');
+    setProfileMessage('');
+
     try {
-      const user = await updateProfile({
-        phoneNumber,
-        channel,
-        language
+      await updateProfile({
+        phoneNumber: phone,
+        preferredChannel: channel,
+        language,
       });
-      setMessage('Profile saved successfully.');
-      // user.id is the backend user id; profile in hook already updated
-      if (user && user.id) {
-        await loadReminders(user.id);
-      }
+      setProfileMessage('Profile saved.');
     } catch (err) {
-      // error message already handled in hook as profileError
+      // Error is already handled inside hook
     }
   };
 
   return (
     <section>
-      <h2>Reminders & Profile</h2>
-      <p style={{ fontSize: '0.9rem' }}>
-        Save your phone number and how you’d like to receive reminders.
+      <h2>Reminders &amp; Profile</h2>
+      <p>
+        Save your phone number and how you’d like to receive reminders. Below
+        you’ll see any upcoming reminders you’ve set.
       </p>
 
       <form onSubmit={handleSaveProfile} className="form">
@@ -80,10 +86,9 @@ function Reminders() {
           Phone number
           <input
             type="tel"
-            value={phoneNumber}
-            onChange={e => setPhoneNumber(e.target.value)}
-            placeholder="+234..."
-            required
+            placeholder="+250..."
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
           />
         </label>
 
@@ -91,10 +96,10 @@ function Reminders() {
           Channel
           <select
             value={channel}
-            onChange={e => setChannel(e.target.value)}
+            onChange={(e) => setChannel(e.target.value)}
           >
-            <option value="sms">SMS</option>
-            <option value="whatsapp">WhatsApp</option>
+            <option value="SMS">SMS</option>
+            <option value="WhatsApp">WhatsApp</option>
           </select>
         </label>
 
@@ -102,10 +107,11 @@ function Reminders() {
           Language (optional)
           <select
             value={language}
-            onChange={e => setLanguage(e.target.value)}
+            onChange={(e) => setLanguage(e.target.value)}
           >
-            <option value="en">English</option>
-            {/* Future: add more languages here */}
+            <option value="English">English</option>
+            <option value="Kinyarwanda">Kinyarwanda</option>
+            <option value="French">French</option>
           </select>
         </label>
 
@@ -115,54 +121,76 @@ function Reminders() {
           </p>
         )}
 
-        {message && !profileError && (
-          <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-            {message}
+        {profileMessage && (
+          <p
+            style={{
+              marginTop: '0.5rem',
+              color: '#059669',
+              fontSize: '0.9rem',
+            }}
+          >
+            {profileMessage}
           </p>
         )}
 
-        <button
-          type="submit"
-          className="primary-btn"
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save profile'}
+        <button type="submit" className="primary-btn" disabled={savingProfile}>
+          {savingProfile ? 'Saving…' : 'Save profile'}
         </button>
       </form>
 
-      <hr style={{ margin: '1.5rem 0' }} />
+      <hr style={{ margin: '2rem 0' }} />
 
       <h3>Your reminders</h3>
 
-      {loadingReminders && <p>Loading reminders...</p>}
-      {remindersError && (
-        <p className="error">{remindersError}</p>
-      )}
+      {remindersLoading && <p>Loading your reminders…</p>}
+      {remindersError && <p className="error">{remindersError}</p>}
 
-      {!loadingReminders && reminders.length === 0 && (
+      {!remindersLoading && !remindersError && reminders.length === 0 && (
         <p>No reminders yet. Set one from a clinic page.</p>
       )}
 
-      <ul className="list">
-        {reminders.map(r => (
-          <li key={r.id} className="card">
-            <p>
-              <strong>Type:</strong> {r.type}
-            </p>
-            <p>
-              <strong>When:</strong>{' '}
-              {new Date(r.scheduledAt).toLocaleString()}
-            </p>
-            <p>
-              <strong>Message:</strong> {r.message}
-            </p>
-            <p>
-              <strong>Status:</strong> {r.status}</p>
-          </li>
-        ))}
-      </ul>
+      {!remindersLoading && reminders.length > 0 && (
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            marginTop: '1rem',
+            maxWidth: '40rem',
+          }}
+        >
+          {reminders.map((r) => (
+            <li
+              key={r.id}
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                marginBottom: '0.75rem',
+                background: '#fafafa',
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>
+                {r.clinicId ? `Clinic #${r.clinicId}` : 'Visit reminder'}
+              </div>
+
+              <div style={{ fontSize: '0.9rem', marginTop: '0.15rem' }}>
+                {r.type === 'medication' ? 'Medication' : 'Visit'} •{' '}
+                {new Date(r.scheduledFor).toLocaleString()}
+              </div>
+
+              <div
+                style={{
+                  fontSize: '0.8rem',
+                  marginTop: '0.15rem',
+                  color: '#6b7280',
+                }}
+              >
+                Channel: {r.channel} • Status: {r.status}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
-
-export default Reminders;

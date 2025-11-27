@@ -1,48 +1,84 @@
+// src/routes/reminders.js
 const express = require('express');
 const router = express.Router();
 
-const {
-  createReminder,
-  getRemindersForUser,
-  getAllReminders
-} = require('../models/reminderStore');
+// Simple in-memory store for demo purposes.
+// This disappears when the server restarts, which is fine for the prototype.
+const demoReminders = [];
 
-const { getUserById } = require('../models/userStore');
+/**
+ * GET /api/reminders
+ * Returns all reminders for a given userId from the in-memory store.
+ * Example: /api/reminders?userId=1
+ */
+router.get('/', (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
 
-router.post('/', (req, res) => {
-  const { userId, type, scheduledAt, message, metadata } = req.body;
+    if (!userId || Number.isNaN(userId)) {
+      // no valid userId → just return empty list, don’t error
+      return res.json([]);
+    }
 
-  if (!userId || !type || !scheduledAt || !message) {
-    return res.status(400).json({
-      error: 'userId, type, scheduledAt, and message are required'
-    });
+    const list = demoReminders
+      .filter((r) => r.userId === userId)
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledFor).getTime() -
+          new Date(b.scheduledFor).getTime()
+      );
+
+    return res.json(list);
+  } catch (err) {
+    console.error('Error in demo GET /api/reminders:', err);
+    // degrade gracefully
+    return res.json([]);
   }
-
-  const user = getUserById(userId);
-  if (!user) {
-    return res.status(400).json({ error: 'Invalid userId' });
-  }
-
-  const reminder = createReminder({
-    userId,
-    type,
-    scheduledAt,
-    message,
-    metadata
-  });
-
-  res.status(201).json(reminder);
 });
 
-router.get('/', (req, res) => {
-  const { userId } = req.query;
+/**
+ * POST /api/reminders
+ * Stores a new reminder in the in-memory array and returns it.
+ * Body: { userId, clinicId, type, channel, scheduledFor }
+ */
+router.post('/', (req, res) => {
+  try {
+    const {
+      userId,
+      clinicId,
+      type = 'visit',
+      channel = 'SMS',
+      scheduledFor,
+    } = req.body;
 
-  if (userId) {
-    const list = getRemindersForUser(userId);
-    return res.json(list);
+    const numericUserId = Number(userId);
+
+    if (!numericUserId || !scheduledFor) {
+      return res
+        .status(400)
+        .json({ error: 'userId and scheduledFor are required' });
+    }
+
+    const reminder = {
+      id: Date.now(), // cheap unique id for the demo
+      userId: numericUserId,
+      clinicId: clinicId ? Number(clinicId) : null,
+      type,
+      channel,
+      scheduledFor,
+      status: 'pending',
+    };
+
+    demoReminders.push(reminder);
+    console.log('DEMO REMINDER STORED IN MEMORY:', reminder);
+
+    return res.status(201).json(reminder);
+  } catch (err) {
+    console.error('Error in demo POST /api/reminders:', err);
+    return res
+      .status(400)
+      .json({ error: 'Unable to create reminder (demo).' });
   }
-
-  res.json(getAllReminders());
 });
 
 module.exports = router;

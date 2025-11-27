@@ -1,263 +1,409 @@
 // src/pages/ClinicDetails.jsx
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
-import useUserProfile from '../hooks/useUserprofile';
-import { createReminder } from '../api/reminders';
-import { addClinicNote, getClinicNotes } from '../api/clinicsAdmin';
+import { fetchClinicNotes, addClinicNote } from '../api/clinicNotes';
+import { useAuth } from '../context/AuthContext';
 
-function ClinicDetails() {
-  const { id } = useParams();
+export default function ClinicDetails() {
+  const { id } = useParams(); // clinic id from URL
+  const clinicId = Number(id);
 
-  // Clinic data
+  const { user, isAdmin, isChw } = useAuth();
+
   const [clinic, setClinic] = useState(null);
-  const [error, setError] = useState('');
+  const [clinicLoading, setClinicLoading] = useState(true);
+  const [clinicError, setClinicError] = useState('');
 
-  // User profile (for reminders)
-  const { profile } = useUserProfile();
-
-  // Reminder form state
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [note, setNote] = useState('');
-  const [savingReminder, setSavingReminder] = useState(false);
-  const [reminderMessage, setReminderMessage] = useState('');
-
-  // CHW notes state
   const [notes, setNotes] = useState([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [noteContent, setNoteContent] = useState('');
-  const [noteMessage, setNoteMessage] = useState('');
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [notesError, setNotesError] = useState('');
 
+  // New note state (for CHW/admin)
+  const [noteContent, setNoteContent] = useState('');
+  const [noteSubmitting, setNoteSubmitting] = useState(false);
+  const [noteSubmitError, setNoteSubmitError] = useState('');
+
+  const canAddNotes = isAdmin || isChw;
+
+  // NEW: reminder state
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState('');
+
+  // Load clinic details
   useEffect(() => {
     const loadClinic = async () => {
       try {
-        const res = await api.get(`/clinics/${id}`);
+        setClinicError('');
+        setClinicLoading(true);
+        const res = await api.get(`/clinics/${clinicId}`);
         setClinic(res.data);
       } catch (err) {
-        console.error(err);
-        setError('Clinic not found.');
+        console.error('Error loading clinic details:', err);
+        setClinicError('Unable to load this clinic right now.');
+      } finally {
+        setClinicLoading(false);
       }
     };
 
+    if (!Number.isNaN(clinicId)) {
+      loadClinic();
+    } else {
+      setClinicError('Invalid clinic id.');
+      setClinicLoading(false);
+    }
+  }, [clinicId]);
+
+  // Load clinic notes
+  useEffect(() => {
     const loadNotes = async () => {
       try {
+        setNotesError('');
         setNotesLoading(true);
-        const data = await getClinicNotes(id);
+        const data = await fetchClinicNotes(clinicId);
         setNotes(data);
       } catch (err) {
-        console.error(err);
+        console.error('Error loading clinic notes:', err);
+        setNotesError('Unable to load field notes for this clinic.');
       } finally {
         setNotesLoading(false);
       }
     };
 
-    loadClinic();
-    loadNotes();
-  }, [id]);
+    if (!Number.isNaN(clinicId)) {
+      loadNotes();
+    }
+  }, [clinicId]);
 
-  const handleCreateReminder = async (e) => {
+  const handleAddNote = async (e) => {
     e.preventDefault();
+    setNoteSubmitError('');
 
-    if (!profile?.userId) {
-      setReminderMessage('Please save your phone number in the Reminders page first.');
+    if (!noteContent.trim()) {
+      setNoteSubmitError('Please write a short note before submitting.');
       return;
     }
 
-    if (!date || !time) {
-      setReminderMessage('Please choose both date and time.');
-      return;
+    try {
+      setNoteSubmitting(true);
+
+      const payload = {
+        authorName: user?.email || user?.phoneNumber || null,
+        // role is optional; backend defaults to 'chw' if not provided
+        content: noteContent.trim(),
+      };
+
+      const created = await addClinicNote(clinicId, payload);
+
+      // Prepend new note to the list
+      setNotes((prev) => [created, ...prev]);
+      setNoteContent('');
+    } catch (err) {
+      console.error('Error adding clinic note:', err);
+      const msg =
+        err.response?.data?.error ||
+        'Unable to save note. Check your access or try again.';
+      setNoteSubmitError(msg);
+    } finally {
+      setNoteSubmitting(false);
     }
+  };
 
-    const scheduledAt = new Date(`${date}T${time}:00`);
-
-    const message =
-      note?.trim() ||
-      `Clinic appointment at ${clinic?.name || 'the clinic'} on ${scheduledAt.toLocaleString()}`;
+  // NEW: very simple reminder creator for demo
+  const handleSetReminder = async () => {
+    if (!clinic) return;
 
     try {
       setSavingReminder(true);
-      setReminderMessage('');
-      await createReminder({
-        userId: profile.userId,
-        type: 'appointment',
-        scheduledAt: scheduledAt.toISOString(),
-        message,
-        metadata: { clinicId: clinic?.id }
+      setReminderMsg('');
+
+      const now = new Date();
+      // Tomorrow at 09:00 local time
+      const tomorrowAtNine = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        9,
+        0,
+        0
+      );
+
+      // For now, use the logged-in user's id if available, otherwise demo user #1
+      const userId = user?.id || 1;
+
+      await api.post('/reminders', {
+        userId,
+        clinicId,
+        type: 'visit',
+        channel: 'SMS',
+        scheduledFor: tomorrowAtNine.toISOString(),
       });
 
-      setReminderMessage('Reminder created successfully.');
-      setDate('');
-      setTime('');
-      setNote('');
+      setReminderMsg('Reminder created for tomorrow at 9:00.');
     } catch (err) {
-      console.error(err);
-      setReminderMessage('Unable to create reminder. Please try again.');
+      console.error('Error creating reminder:', err);
+      setReminderMsg('Unable to create reminder right now.');
     } finally {
       setSavingReminder(false);
     }
   };
 
-  const handleAddNote = async (e) => {
-    e.preventDefault();
-
-    if (!noteContent.trim()) {
-      setNoteMessage('Please enter a note.');
-      return;
-    }
-
-    try {
-      setNoteMessage('');
-      await addClinicNote(id, {
-        authorName: 'CHW', // later this could be a real user identity
-        role: 'chw',
-        content: noteContent.trim()
-      });
-
-      setNoteContent('');
-      const updated = await getClinicNotes(id);
-      setNotes(updated);
-      setNoteMessage('Note added.');
-    } catch (err) {
-      console.error(err);
-      setNoteMessage('Unable to add note. Please try again.');
-    }
-  };
-
-  if (error) return <p>{error}</p>;
-  if (!clinic) return <p>Loading clinic...</p>;
-
   return (
-    <section>
-      <h2>{clinic.name}</h2>
-      {clinic.address && <p>{clinic.address}</p>}
-      {clinic.area && (
-        <p>
-          <strong>Area:</strong> {clinic.area}
-        </p>
-      )}
-      {clinic.opening_hours && (
-        <p>
-          <strong>Opening hours:</strong> {clinic.opening_hours}
-        </p>
-      )}
-      {clinic.services && clinic.services.length > 0 && (
-        <p>
-          <strong>Services:</strong> {clinic.services.join(', ')}
-        </p>
-      )}
-
-      <hr style={{ margin: '1.5rem 0' }} />
-
-      {/* Appointment Reminder Section */}
-      <h3>Set an appointment reminder</h3>
-
-      {!profile && (
-        <p style={{ fontSize: '0.9rem' }}>
-          You haven't saved your phone number yet. Go to the{' '}
-          <Link to="/reminders">Reminders page</Link> to set it up.
-        </p>
-      )}
-
-      <form onSubmit={handleCreateReminder} className="form">
-        <label>
-          Date
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Time
-          <input
-            type="time"
-            value={time}
-            onChange={e => setTime(e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Optional note
-          <textarea
-            rows="2"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="What should we remind you about?"
-          />
-        </label>
-
-        <button type="submit" className="primary-btn" disabled={savingReminder}>
-          {savingReminder ? 'Saving reminder...' : 'Create reminder'}
-        </button>
-      </form>
-
-      {reminderMessage && (
-        <p style={{ marginTop: '0.75rem', fontSize: '0.9rem' }}>
-          {reminderMessage}
-        </p>
-      )}
-
-      <p style={{ marginTop: '1rem', fontSize: '0.8rem' }}>
-        In a later version, reminders will be delivered by SMS or WhatsApp using your saved contact.
-      </p>
-
-      <hr style={{ margin: '1.5rem 0' }} />
-
-      {/* CHW Notes Section */}
-      <h3>CHW field notes</h3>
-      <p style={{ fontSize: '0.85rem' }}>
-        For community health workers to record observations about this clinic.
-      </p>
-
-      {notesLoading && <p>Loading notes...</p>}
-
-      <ul className="list">
-        {notes.map(n => (
-          <li key={n.id} className="card">
-            <p style={{ fontSize: '0.9rem' }}>{n.content}</p>
-            <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-              <strong>{n.authorName}</strong> ·{' '}
-              {new Date(n.createdAt).toLocaleString()}
-            </p>
-          </li>
-        ))}
-      </ul>
-
-      {!notesLoading && notes.length === 0 && (
-        <p>No CHW notes for this clinic yet.</p>
-      )}
-
-      <form
-        onSubmit={handleAddNote}
-        className="form"
-        style={{ marginTop: '1rem' }}
+    <main style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto' }}>
+      <Link
+        to="/clinic-finder"
+        style={{
+          display: 'inline-block',
+          marginBottom: '1rem',
+          fontSize: '0.85rem',
+          color: '#2563eb',
+        }}
       >
-        <label>
-          Add note
-          <textarea
-            rows="2"
-            value={noteContent}
-            onChange={e => setNoteContent(e.target.value)}
-            placeholder="e.g. Clinic is very busy on Mondays; advise patients to come earlier."
-          />
-        </label>
+        ← Back to clinic finder
+      </Link>
 
-        <button type="submit" className="secondary-btn">
-          Save note
-        </button>
-      </form>
-
-      {noteMessage && (
-        <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-          {noteMessage}
+      {/* Clinic info */}
+      {clinicLoading ? (
+        <p>Loading clinic details…</p>
+      ) : clinicError ? (
+        <p
+          style={{
+            background: '#fee2e2',
+            color: '#b91c1c',
+            padding: '0.75rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.9rem',
+          }}
+        >
+          {clinicError}
         </p>
+      ) : !clinic ? (
+        <p>Clinic not found.</p>
+      ) : (
+        <>
+          <section
+            style={{
+              padding: '1rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #e5e7eb',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <h1 style={{ fontSize: '1.4rem', marginBottom: '0.25rem' }}>
+              {clinic.name}
+            </h1>
+            <p style={{ fontSize: '0.9rem', color: '#4b5563' }}>
+              {clinic.address || clinic.area || 'Location details coming soon.'}
+            </p>
+
+            {clinic.openingHours && (
+              <p
+                style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: '#374151',
+                }}
+              >
+                <strong>Opening hours: </strong>
+                {clinic.openingHours}
+              </p>
+            )}
+
+            {Array.isArray(clinic.services) && clinic.services.length > 0 && (
+              <p
+                style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: '#374151',
+                }}
+              >
+                <strong>Services: </strong>
+                {clinic.services.join(', ')}
+              </p>
+            )}
+
+            {/* NEW: reminder button */}
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={handleSetReminder}
+                disabled={savingReminder}
+              >
+                {savingReminder
+                  ? 'Setting reminder…'
+                  : 'Set visit reminder for tomorrow 9:00'}
+              </button>
+
+              {reminderMsg && (
+                <p
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.85rem',
+                    color: reminderMsg.startsWith('Unable')
+                      ? '#b91c1c'
+                      : '#059669',
+                  }}
+                >
+                  {reminderMsg}
+                </p>
+              )}
+            </div>
+          </section>
+        </>
       )}
-    </section>
+
+      {/* Notes section */}
+      <section>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+          Field notes from health workers
+        </h2>
+        <p
+          style={{
+            fontSize: '0.85rem',
+            color: '#4b5563',
+            marginBottom: '0.75rem',
+          }}
+        >
+          Short updates from community health workers about how this clinic is
+          functioning (e.g. peak days, common issues, tips for patients).
+        </p>
+
+        {/* CHW/Admin note form */}
+        {canAddNotes && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              padding: '0.75rem',
+              borderRadius: '0.75rem',
+              border: '1px solid #e5e7eb',
+              background: '#f9fafb',
+            }}
+          >
+            <h3
+              style={{
+                fontSize: '0.95rem',
+                marginBottom: '0.5rem',
+              }}
+            >
+              Add a new note
+            </h3>
+
+            {noteSubmitError && (
+              <p
+                style={{
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {noteSubmitError}
+              </p>
+            )}
+
+            <form
+              onSubmit={handleAddNote}
+              style={{ display: 'grid', gap: '0.5rem' }}
+            >
+              <textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                rows={3}
+                placeholder="Share a short note about peak days, patient flow, staff availability, or anything that helps patients plan better."
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.9rem',
+                }}
+              />
+
+              <button
+                type="submit"
+                disabled={noteSubmitting}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '0.35rem 0.9rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: noteSubmitting ? '#9ca3af' : '#2563eb',
+                  color: 'white',
+                  fontSize: '0.85rem',
+                  cursor: noteSubmitting ? 'default' : 'pointer',
+                }}
+              >
+                {noteSubmitting ? 'Saving…' : 'Post note'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Notes list */}
+        {notesLoading ? (
+          <p style={{ fontSize: '0.9rem' }}>Loading notes…</p>
+        ) : notesError ? (
+          <p
+            style={{
+              background: '#fee2e2',
+              color: '#b91c1c',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.85rem',
+            }}
+          >
+            {notesError}
+          </p>
+        ) : notes.length === 0 ? (
+          <p style={{ fontSize: '0.9rem', color: '#4b5563' }}>
+            No notes have been added for this clinic yet.
+          </p>
+        ) : (
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              display: 'grid',
+              gap: '0.75rem',
+            }}
+          >
+            {notes.map((note) => (
+              <li
+                key={note.id}
+                style={{
+                  borderRadius: '0.75rem',
+                  border: '1px solid #e5e7eb',
+                  padding: '0.75rem',
+                }}
+              >
+                <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  {note.content}
+                </p>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>
+                    {note.author || 'Health worker'}{' '}
+                    {note.role ? `(${note.role})` : ''}
+                  </span>
+                  {note.createdAt && (
+                    <span>
+                      {new Date(note.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
   );
 }
-
-export default ClinicDetails;
