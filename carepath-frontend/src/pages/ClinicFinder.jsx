@@ -90,7 +90,10 @@ function ClinicFinder() {
   return (
     <section>
       <h2>Find a nearby public clinic</h2>
-      <p>Start with your area, or use your current location.</p>
+      <p style={{ fontSize: '0.9rem', color: '#4b5563', marginBottom: '0.75rem' }}>
+        Search using your area or current location. Clinic data is loaded from public facilities in Kigali.
+      </p>
+
 
       <form onSubmit={handleManualSearch} className="form">
         <label>
@@ -175,7 +178,9 @@ function ClinicFinder() {
         ))}
 
         {!loading && clinics.length === 0 && !error && (
-          <p>No clinics found yet. Try another area or adjust your radius.</p>
+          <p style={{ fontSize: '0.9rem', color: '#4b5563' }}>
+            No clinics found for this search. Try another area or widen your radius
+          </p>
         )}
       </div>
     </section>
