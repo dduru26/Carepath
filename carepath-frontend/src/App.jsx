@@ -1,27 +1,40 @@
 // src/App.jsx
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
+import Header from './components/Header';
 import Home from './pages/Home';
 import ClinicFinder from './pages/ClinicFinder';
 import ClinicDetails from './pages/ClinicDetails';
 import VisitGuides from './pages/VisitGuides';
-import VisitGuideDetails from './pages/VisitGuideDetails';
 import Reminders from './pages/Reminders';
+import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
+import RequireAdmin from './components/RequireAdmin';
 
 function App() {
   return (
-    <Layout>
+    <div className="app-root">
+      <Header />
+
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/clinic-finder" element={<ClinicFinder />} />
-        <Route path="/clinics/:id" element={<ClinicDetails />} />
-        <Route path="/visit-guides" element={<VisitGuides />} />
-        <Route path="/visit-guides/:id" element={<VisitGuideDetails />} />
+        <Route path="/clinic/:id" element={<ClinicDetails />} />
+        <Route path="/visit-guides/*" element={<VisitGuides />} />
         <Route path="/reminders" element={<Reminders />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminDashboard />
+            </RequireAdmin>
+          }
+        />
       </Routes>
-    </Layout>
+    </div>
   );
 }
 

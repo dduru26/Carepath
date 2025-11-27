@@ -11,15 +11,22 @@ datasource db {
 
 /// Main user model for reminders / CHW / admin
 model User {
-  id          Int           @id @default(autoincrement())
-  phoneNumber String        @unique
-  channel     String        // 'sms' | 'whatsapp'
-  language    String?       @default("en")
-  timezone    String?       // e.g. "Africa/Kigali"
-  createdAt   DateTime      @default(now())
+  id           Int           @id @default(autoincrement())
 
-  reminders   Reminder[]
-  notes       ClinicNote[]  @relation("NoteAuthor")
+  // Auth-related fields
+  email        String?       @unique
+  phoneNumber  String        @unique
+  passwordHash String?
+  role         String        @default("patient") // 'patient' | 'chw' | 'admin'
+
+  // Profile / notification preferences
+  channel      String        // 'sms' | 'whatsapp'
+  language     String?       @default("en")
+  timezone     String?       // e.g. "Africa/Kigali"
+  createdAt    DateTime      @default(now())
+
+  reminders    Reminder[]
+  notes        ClinicNote[]  @relation("NoteAuthor")
 }
 
 /// Health facility / clinic
