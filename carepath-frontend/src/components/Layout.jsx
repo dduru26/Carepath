@@ -25,7 +25,7 @@ function Layout({ children }) {
 
       <nav className="app-nav">
         <Link to="/">Home</Link>
-        <Link to="/clinics">Find a clinic</Link>
+        <Link to="/clinic-finder">Find a clinic</Link>
         <Link to="/visit-guides">Prepare for a visit</Link>
         <Link to="/reminders">Reminders</Link>
         {/* <Link to="/admin">Admin</Link>  // keep commented if you want it hidden */}

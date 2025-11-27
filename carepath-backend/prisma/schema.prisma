@@ -1,0 +1,99 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Main user model for reminders / CHW / admin
+model User {
+  id          Int           @id @default(autoincrement())
+  phoneNumber String        @unique
+  channel     String        // 'sms' | 'whatsapp'
+  language    String?       @default("en")
+  timezone    String?       // e.g. "Africa/Kigali"
+  createdAt   DateTime      @default(now())
+
+  reminders   Reminder[]
+  notes       ClinicNote[]  @relation("NoteAuthor")
+}
+
+/// Health facility / clinic
+model Clinic {
+  id           Int           @id @default(autoincrement())
+  name         String
+  address      String?
+  area         String?
+  latitude     Float?
+  longitude    Float?
+  openingHours String?
+  services     String        // comma-separated list for now
+  isPublic     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  notes        ClinicNote[]
+  reminders    Reminder[]    @relation("ClinicReminders")
+}
+
+/// Notes that CHWs or admins attach to a clinic
+model ClinicNote {
+  id         Int       @id @default(autoincrement())
+  clinic     Clinic    @relation(fields: [clinicId], references: [id])
+  clinicId   Int
+
+  author     User?     @relation("NoteAuthor", fields: [authorId], references: [id])
+  authorId   Int?
+  authorName String?
+  role       String?   // 'chw', 'admin', etc.
+
+  content    String
+  createdAt  DateTime  @default(now())
+}
+
+/// High-level visit guide e.g. "Antenatal Visit", "Child Immunization"
+model VisitGuide {
+  id        Int              @id @default(autoincrement())
+  slug      String           @unique
+  title     String
+  category  String?
+  locale    String           @default("en")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  steps     VisitGuideStep[]
+}
+
+/// Individual steps/checklist items inside a guide
+model VisitGuideStep {
+  id           Int          @id @default(autoincrement())
+  visitGuide   VisitGuide   @relation(fields: [visitGuideId], references: [id])
+  visitGuideId Int
+
+  order        Int
+  text         String
+}
+
+/// Appointment / medication reminders
+model Reminder {
+  id              Int       @id @default(autoincrement())
+  user            User      @relation(fields: [userId], references: [id])
+  userId          Int
+
+  clinic          Clinic?   @relation("ClinicReminders", fields: [clinicId], references: [id])
+  clinicId        Int?
+
+  type            String    // 'appointment', 'medication', etc.
+  message         String
+  channelOverride String?   // if you ever want per-reminder override
+
+  scheduledAtUtc  DateTime
+  status          String    @default("scheduled") // 'scheduled' | 'sent' | 'failed'
+  createdAt       DateTime  @default(now())
+  lastAttemptAt   DateTime?
+  failureReason   String?
+}
