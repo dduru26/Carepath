@@ -170,13 +170,19 @@ export default function Reminders() {
               }}
             >
               <div style={{ fontWeight: 600 }}>
-                {r.clinicId ? `Clinic #${r.clinicId}` : 'Visit reminder'}
+                {r.clinic?.name || 'Visit reminder'}
               </div>
 
               <div style={{ fontSize: '0.9rem', marginTop: '0.15rem' }}>
                 {r.type === 'medication' ? 'Medication' : 'Visit'} •{' '}
                 {new Date(r.scheduledFor).toLocaleString()}
               </div>
+
+              {r.clinic?.area && (
+                <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                  Area: {r.clinic.area}
+                  </div>
+              )}
 
               <div
                 style={{
