@@ -1,21 +1,18 @@
-// src/pages/Login.jsx
+// src/pages/Signup.jsx
 import { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Login() {
-  const { login, authError, setAuthError } = useAuth();
+export default function Signup() {
+  const { signup, authError, setAuthError } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const searchParams = new URLSearchParams(location.search);
-  const isAdminLogin = searchParams.get('admin') === '1';
 
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [channel, setChannel] = useState('SMS');
+  const [language, setLanguage] = useState('English');
   const [submitting, setSubmitting] = useState(false);
-
-  const from = location.state?.from?.pathname || '/clinic-finder';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,10 +20,10 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await login(email, password);
-      navigate(from, { replace: true });
+      await signup({ email, phoneNumber, password, channel, language });
+      navigate('/clinic-finder');
     } catch (err) {
-      // error already stored in authError
+      // authError already set
     } finally {
       setSubmitting(false);
     }
@@ -40,9 +37,7 @@ export default function Login() {
         margin: '0 auto',
       }}
     >
-      <h2 style={{ marginBottom: '0.75rem' }}>
-        {isAdminLogin ? 'Admin login' : 'Log in to CarePath'}
-      </h2>
+      <h2 style={{ marginBottom: '0.75rem' }}>Create your CarePath account</h2>
       <p
         style={{
           fontSize: '0.9rem',
@@ -50,9 +45,8 @@ export default function Login() {
           marginBottom: '1.5rem',
         }}
       >
-        {isAdminLogin
-          ? 'Use your admin CarePath account to manage clinics and data.'
-          : 'Access clinic finder, visit checklists, and your reminders.'}
+        Save your clinic preferences and reminders so you don’t lose track of
+        important visits.
       </p>
 
       <form onSubmit={handleSubmit} className="form">
@@ -68,14 +62,48 @@ export default function Login() {
         </label>
 
         <label>
+          Phone number (for SMS/WhatsApp)
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="+250..."
+          />
+        </label>
+
+        <label>
           Password
           <input
             type="password"
             required
+            minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete="new-password"
           />
+        </label>
+
+        <label>
+          Preferred channel
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+          >
+            <option value="SMS">SMS</option>
+            <option value="WhatsApp">WhatsApp</option>
+          </select>
+        </label>
+
+        <label>
+          Language
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+          >
+            <option value="English">English</option>
+            <option value="Kinyarwanda">Kinyarwanda</option>
+            <option value="French">French</option>
+          </select>
         </label>
 
         {authError && (
@@ -98,27 +126,17 @@ export default function Login() {
           disabled={submitting}
           style={{ marginTop: '0.5rem' }}
         >
-          {submitting ? 'Logging in…' : 'Log in'}
+          {submitting ? 'Creating account…' : 'Sign up'}
         </button>
       </form>
 
       <p style={{ fontSize: '0.85rem', marginTop: '1rem' }}>
-        Don’t have an account?{' '}
+        Already have an account?{' '}
         <Link
-          to="/signup"
+          to="/login"
           style={{ color: '#2563eb', textDecoration: 'underline' }}
         >
-          Sign up
-        </Link>
-      </p>
-
-      <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-        Admin account?{' '}
-        <Link
-          to="/login?admin=1"
-          style={{ color: '#2563eb', textDecoration: 'underline' }}
-        >
-          Log in here
+          Log in
         </Link>
       </p>
     </main>

@@ -26,10 +26,29 @@ export default function ClinicDetails() {
 
   const canAddNotes = isAdmin || isChw;
 
-  // Reminder state
+  // NEW: reminder state (with date + time picker)
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('09:00');
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
-  const [reminderTime, setReminderTime] = useState('09:00'); // default time
+  const [reminderError, setReminderError] = useState('');
+
+  // Set default reminder date to "tomorrow at 09:00"
+  useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
+
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const dd = String(tomorrow.getDate()).padStart(2, '0');
+
+    setReminderDate(`${yyyy}-${mm}-${dd}`);
+    setReminderTime('09:00');
+  }, []);
 
   // Load clinic details
   useEffect(() => {
@@ -110,51 +129,49 @@ export default function ClinicDetails() {
     }
   };
 
-  // Reminder creator with flexible time
-  const handleSetReminder = async () => {
-    if (!clinic) return;
+  // NEW: reminder creator using chosen date + time
+  const handleSetReminder = async (e) => {
+    e.preventDefault();
+    setReminderError('');
+    setReminderMsg('');
+
+    if (!reminderDate || !reminderTime) {
+      setReminderError('Please choose a date and time for your reminder.');
+      return;
+    }
+
+    if (!clinic) {
+      setReminderError('Clinic information is missing.');
+      return;
+    }
 
     try {
       setSavingReminder(true);
-      setReminderMsg('');
 
-      // Parse HH:MM from the time input
-      const [hoursStr, minutesStr] = reminderTime.split(':');
-      const hours = Number(hoursStr);
-      const minutes = Number(minutesStr);
+      // Parse date & time into a JS Date
+      const [yearStr, monthStr, dayStr] = reminderDate.split('-');
+      const [hourStr, minuteStr] = reminderTime.split(':');
+      const year = Number(yearStr);
+      const month = Number(monthStr) - 1; // JS months = 0–11
+      const day = Number(dayStr);
+      const hour = Number(hourStr);
+      const minute = Number(minuteStr);
 
-      const now = new Date();
-      const scheduled = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + 1, // tomorrow
-        Number.isFinite(hours) ? hours : 9,
-        Number.isFinite(minutes) ? minutes : 0,
-        0,
-        0
-      );
-
-      const userId = user?.id || 1; // demo fallback
+      const scheduled = new Date(year, month, day, hour, minute, 0);
 
       await api.post('/reminders', {
-        userId,
         clinicId,
         type: 'visit',
-        channel: 'SMS',
+        channel: 'SMS', // or infer from profile later
         scheduledFor: scheduled.toISOString(),
       });
 
-      const niceTime = scheduled.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
       setReminderMsg(
-        `Reminder created for tomorrow at ${niceTime}. You’ll see it under the Reminders tab.`
+        `Reminder created for ${scheduled.toLocaleString()} for this clinic.`
       );
     } catch (err) {
       console.error('Error creating reminder:', err);
-      setReminderMsg('Unable to create reminder right now.');
+      setReminderError('Unable to create reminder right now. Please try again.');
     } finally {
       setSavingReminder(false);
     }
@@ -221,7 +238,7 @@ export default function ClinicDetails() {
               </p>
             )}
 
-            {Array.isArray(clinic.services) && clinic.services.length > 0 && (
+            {clinic.services && (
               <p
                 style={{
                   marginTop: '0.5rem',
@@ -230,63 +247,104 @@ export default function ClinicDetails() {
                 }}
               >
                 <strong>Services: </strong>
-                {clinic.services.join(', ')}
+                {clinic.services}
               </p>
             )}
 
-            {/* Reminder time + button */}
+            {/* NEW: reminder form */}
             <div
               style={{
                 marginTop: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
+                paddingTop: '0.75rem',
+                borderTop: '1px dashed #e5e7eb',
               }}
             >
-              <label
+              <h3
                 style={{
-                  fontSize: '0.85rem',
+                  fontSize: '0.95rem',
+                  marginBottom: '0.5rem',
+                }}
+              >
+                Set a visit reminder for this clinic
+              </h3>
+
+              <form
+                onSubmit={handleSetReminder}
+                style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
                   alignItems: 'center',
-                  gap: '0.4rem',
                 }}
               >
-                Reminder time for tomorrow:
-                <input
-                  type="time"
-                  value={reminderTime}
-                  onChange={(e) => setReminderTime(e.target.value)}
+                <label style={{ fontSize: '0.85rem' }}>
+                  Date
+                  <input
+                    type="date"
+                    value={reminderDate}
+                    onChange={(e) => setReminderDate(e.target.value)}
+                    style={{
+                      display: 'block',
+                      marginTop: '0.25rem',
+                      padding: '0.25rem 0.4rem',
+                      fontSize: '0.9rem',
+                      borderRadius: 6,
+                      border: '1px solid #d1d5db',
+                    }}
+                  />
+                </label>
+
+                <label style={{ fontSize: '0.85rem' }}>
+                  Time
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    style={{
+                      display: 'block',
+                      marginTop: '0.25rem',
+                      padding: '0.25rem 0.4rem',
+                      fontSize: '0.9rem',
+                      borderRadius: 6,
+                      border: '1px solid #d1d5db',
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={savingReminder}
+                  style={{ marginTop: '1.25rem' }}
+                >
+                  {savingReminder ? 'Setting reminder…' : 'Save reminder'}
+                </button>
+              </form>
+
+              {reminderError && (
+                <p
                   style={{
-                    padding: '0.2rem 0.4rem',
+                    marginTop: '0.5rem',
                     fontSize: '0.85rem',
+                    color: '#b91c1c',
                   }}
-                />
-              </label>
+                >
+                  {reminderError}
+                </p>
+              )}
 
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={handleSetReminder}
-                disabled={savingReminder}
-              >
-                {savingReminder ? 'Setting reminder…' : 'Set visit reminder'}
-              </button>
+              {reminderMsg && (
+                <p
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.85rem',
+                    color: '#059669',
+                  }}
+                >
+                  {reminderMsg}
+                </p>
+              )}
             </div>
-
-            {reminderMsg && (
-              <p
-                style={{
-                  marginTop: '0.5rem',
-                  fontSize: '0.85rem',
-                  color: reminderMsg.startsWith('Unable')
-                    ? '#b91c1c'
-                    : '#059669',
-                }}
-              >
-                {reminderMsg}
-              </p>
-            )}
           </section>
         </>
       )}

@@ -7,22 +7,21 @@ const visitGuidesRoutes = require('./routes/visitGuides');
 const usersRoutes = require('./routes/users');
 const remindersRoutes = require('./routes/reminders');
 const clinicNotesRoutes = require('./routes/clinicNotes');
-const authRoutes = require('./routes/auth');   // ⬅ add this
+const authRoutes = require('./routes/auth'); // NEW
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// ROUTES
-app.use('/auth', authRoutes);                  // ⬅ mount auth first or anywhere
+// Routes
+app.use('/api/auth', authRoutes);        // NEW
 app.use('/api/clinics', clinicsRoutes);
 app.use('/api/visit-guides', visitGuidesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/clinics', clinicNotesRoutes);
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'CarePath API is running' });
 });

@@ -2,8 +2,12 @@
 import { useEffect, useState } from 'react';
 import useUserProfile from '../hooks/useUserProfile';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 export default function Reminders() {
+  // Logged-in user
+  const { user } = useAuth();
+
   // Profile-related state via your existing hook
   const {
     profile,
@@ -22,7 +26,7 @@ export default function Reminders() {
   const [remindersLoading, setRemindersLoading] = useState(false);
   const [remindersError, setRemindersError] = useState('');
 
-  // When profile loads, hydrate the form fields
+  // Hydrate profile form when profile loads
   useEffect(() => {
     if (profile) {
       setPhone(profile.phoneNumber || '');
@@ -31,23 +35,23 @@ export default function Reminders() {
     }
   }, [profile]);
 
-  // Load reminders for the current user (or demo user as fallback)
+  // Load reminders for the *logged in user* (via JWT)
   useEffect(() => {
     const loadReminders = async () => {
+      if (!user?.id) {
+        // not logged in or still restoring session
+        return;
+      }
+
       try {
         setRemindersLoading(true);
         setRemindersError('');
 
-        // 🔥 For demo: use profile.id OR fallback to userId = 1
-        const userId = profile?.id || 1;
-
-        const res = await api.get('/reminders', {
-          params: { userId },
-        });
-
+        // backend now reads user from token, so no need to send userId
+        const res = await api.get('/reminders');
         setReminders(res.data || []);
       } catch (err) {
-        console.error('Error loading reminders:', err);
+        console.error(err);
         setRemindersError('Unable to load reminders.');
       } finally {
         setRemindersLoading(false);
@@ -55,7 +59,7 @@ export default function Reminders() {
     };
 
     loadReminders();
-  }, [profile]);
+  }, [user]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -69,7 +73,7 @@ export default function Reminders() {
       });
       setProfileMessage('Profile saved.');
     } catch (err) {
-      // Error is already handled inside hook
+      // error message already handled by hook
     }
   };
 
@@ -120,7 +124,6 @@ export default function Reminders() {
             {profileError}
           </p>
         )}
-
         {profileMessage && (
           <p
             style={{
@@ -170,19 +173,21 @@ export default function Reminders() {
               }}
             >
               <div style={{ fontWeight: 600 }}>
-                {r.clinic?.name || 'Visit reminder'}
-              </div>
-
-              <div style={{ fontSize: '0.9rem', marginTop: '0.15rem' }}>
-                {r.type === 'medication' ? 'Medication' : 'Visit'} •{' '}
-                {new Date(r.scheduledFor).toLocaleString()}
+                {r.clinic?.name || (r.clinicId ? `Clinic #${r.clinicId}` : 'Visit reminder')}
               </div>
 
               {r.clinic?.area && (
-                <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                <div
+                  style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.1rem' }}
+                >
                   Area: {r.clinic.area}
-                  </div>
+                </div>
               )}
+
+              <div style={{ fontSize: '0.9rem', marginTop: '0.3rem' }}>
+                {r.type === 'medication' ? 'Medication' : 'Visit'} •{' '}
+                {new Date(r.scheduledFor).toLocaleString()}
+              </div>
 
               <div
                 style={{

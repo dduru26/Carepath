@@ -1,86 +1,101 @@
 // src/components/Header.jsx
-import { NavLink } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
+  const { user, logout, isAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <header
       style={{
-        background: '#111827',
-        color: 'white',
-        padding: '0.75rem 1rem',
-        marginBottom: '1rem',
+        padding: '0.75rem 1.25rem',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
       }}
     >
-      <div
-        style={{
-          maxWidth: 960,
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-        }}
-      >
-        <div style={{ fontWeight: 600, fontSize: '1rem' }}>
-          CarePath
-          <span style={{ fontWeight: 400, fontSize: '0.8rem', marginLeft: 6 }}>
-            Kigali prototype
-          </span>
-        </div>
-
-        <nav
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <Link
+          to="/clinic-finder"
           style={{
-            display: 'flex',
-            gap: '0.75rem',
-            fontSize: '0.85rem',
+            fontWeight: 700,
+            fontSize: '1.1rem',
+            textDecoration: 'none',
+            color: '#111827',
           }}
         >
-          <NavLink
-            to="/"
-            style={({ isActive }) => ({
-              color: isActive ? '#bfdbfe' : '#e5e7eb',
-              textDecoration: 'none',
-            })}
+          CarePath
+        </Link>
+
+        {user && (
+          <nav
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              fontSize: '0.9rem',
+            }}
           >
-            Home
-          </NavLink>
-          <NavLink
-            to="/clinic-finder"
-            style={({ isActive }) => ({
-              color: isActive ? '#bfdbfe' : '#e5e7eb',
-              textDecoration: 'none',
-            })}
-          >
-            Find a clinic
-          </NavLink>
-          <NavLink
-            to="/visit-guides"
-            style={({ isActive }) => ({
-              color: isActive ? '#bfdbfe' : '#e5e7eb',
-              textDecoration: 'none',
-            })}
-          >
-            Visit checklists
-          </NavLink>
-          <NavLink
-            to="/reminders"
-            style={({ isActive }) => ({
-              color: isActive ? '#bfdbfe' : '#e5e7eb',
-              textDecoration: 'none',
-            })}
-          >
-            Reminders
-          </NavLink>
-          <NavLink
-            to="/admin"
-            style={({ isActive }) => ({
-              color: isActive ? '#facc15' : '#e5e7eb',
-              textDecoration: 'none',
-            })}
-          >
-            Admin
-          </NavLink>
-        </nav>
+            <Link to="/clinic-finder">Find a clinic</Link>
+            <Link to="/visit-guides">Visit checklists</Link>
+            <Link to="/reminders">Reminders</Link>
+            {isAdmin && <Link to="/admin">Admin</Link>}
+          </nav>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          fontSize: '0.85rem',
+        }}
+      >
+        {user ? (
+          <>
+            <span style={{ color: '#4b5563' }}>
+              {user.email}
+            </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                border: '1px solid #d1d5db',
+                borderRadius: 999,
+                padding: '0.25rem 0.75rem',
+                background: 'white',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <Link to="/login">Log in</Link>
+            <Link
+              to="/signup"
+              style={{
+                borderRadius: 999,
+                padding: '0.25rem 0.75rem',
+                background: '#2563eb',
+                color: 'white',
+                textDecoration: 'none',
+              }}
+            >
+              Sign up
+            </Link>
+          </>
+        )}
       </div>
     </header>
   );

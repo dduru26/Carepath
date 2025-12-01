@@ -1,109 +1,98 @@
 // src/routes/reminders.js
 const express = require('express');
-const router = express.Router();
-
+const jwt = require('jsonwebtoken');
 const prisma = require('../prismaClient');
 const {
   onNewReminderCreated,
-} = require('../scheduler/reminderScheduler'); // import scheduler handler
+} = require('../scheduler/reminderScheduler'); // adjust path if needed
+
+const router = express.Router();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+
+// Helper: extract userId from Authorization: Bearer <token>
+function getUserIdFromReq(req) {
+  const authHeader = req.headers.authorization || '';
+  const [, token] = authHeader.split(' '); // 'Bearer <token>'
+  if (!token) return null;
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.userId;
+  } catch (err) {
+    console.warn('Invalid token on reminders route:', err.message);
+    return null;
+  }
+}
 
 /**
  * GET /api/reminders
- * Returns all reminders for a given userId from the database.
- * Example: /api/reminders?userId=1
+ * Return all reminders for the logged-in user
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = Number(req.query.userId);
-
-    if (!userId || Number.isNaN(userId)) {
-      // no valid userId → just return empty list, don’t error
-      return res.json([]);
+    const userId = getUserIdFromReq(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
     }
 
     const reminders = await prisma.reminder.findMany({
       where: { userId },
       orderBy: { scheduledFor: 'asc' },
       include: {
-        clinic: true,   // <- pull clinic details
-        },
+        clinic: true, // so frontend can show clinic.name, clinic.area
+      },
     });
 
-    return res.json(reminders);
+    res.json(reminders);
   } catch (err) {
-    console.error('Error in GET /api/reminders:', err);
-    // degrade gracefully for the UI
-    return res.json([]);
+    console.error('Error loading reminders:', err);
+    res.status(500).json({ error: 'Unable to load reminders.' });
   }
 });
 
 /**
  * POST /api/reminders
- * Stores a new reminder in the database and returns it.
- * Body: { userId, clinicId, type, channel, scheduledFor }
+ * Create a reminder for the logged-in user
  */
 router.post('/', async (req, res) => {
   try {
-    const {
-      userId,
-      clinicId,
-      type = 'visit',
-      channel = 'SMS',
-      scheduledFor,
-    } = req.body;
+    const userId = getUserIdFromReq(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
-    const numericUserId = Number(userId);
-    const numericClinicId = clinicId ? Number(clinicId) : null;
+    const { clinicId, type, channel, scheduledFor } = req.body;
 
-    if (!numericUserId || !scheduledFor) {
+    if (!scheduledFor) {
       return res
         .status(400)
-        .json({ error: 'userId and scheduledFor are required' });
+        .json({ error: 'scheduledFor (ISO date string) is required.' });
     }
 
     const reminder = await prisma.reminder.create({
       data: {
-        userId: numericUserId,
-        clinicId: numericClinicId,
-        type,
-        channel,
+        userId,
+        clinicId: clinicId || null,
+        type: type || 'visit',
+        channel: channel || 'SMS',
         scheduledFor: new Date(scheduledFor),
         status: 'pending',
       },
+      include: {
+        clinic: true,
+      },
     });
 
-    // Try to schedule it in-process; if scheduler fails, we still return 201
-    onNewReminderCreated(reminder.id).catch((err) =>
-      console.error('Failed to schedule reminder after create:', err)
-    );
-
-    return res.status(201).json(reminder);
-  } catch (err) {
-    console.error('Error in POST /api/reminders:', err);
-    return res.status(500).json({ error: 'Unable to create reminder' });
-  }
-});
-
-/**
- * (Optional) Cancel endpoint for future UI
- * PATCH /api/reminders/:id/cancel
- */
-router.patch('/:id/cancel', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) {
-      return res.status(400).json({ error: 'Invalid reminder id' });
+    // schedule it in memory so the dev scheduler can fire later
+    if (onNewReminderCreated) {
+      onNewReminderCreated(reminder.id);
     }
 
-    const updated = await prisma.reminder.update({
-      where: { id },
-      data: { status: 'cancelled' },
-    });
-
-    return res.json(updated);
+    res.status(201).json(reminder);
   } catch (err) {
-    console.error('Error in PATCH /api/reminders/:id/cancel:', err);
-    return res.status(500).json({ error: 'Unable to cancel reminder' });
+    console.error('Error creating reminder:', err);
+    res.status(500).json({ error: 'Unable to create reminder.' });
   }
 });
 

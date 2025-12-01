@@ -3,14 +3,18 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import Header from './components/Header';
-import Home from './pages/Home';
+
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+
 import ClinicFinder from './pages/ClinicFinder';
 import ClinicDetails from './pages/ClinicDetails';
 import VisitGuides from './pages/VisitGuides';
 import Reminders from './pages/Reminders';
-import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
+
 import RequireAdmin from './components/RequireAdmin';
+import RequireAuth from './components/RequireAuth';
 
 function App() {
   return (
@@ -18,36 +22,58 @@ function App() {
       <Header />
 
       <Routes>
-        {/* Home */}
-        <Route path="/" element={<Home />} />
-        {/* Optional alias if you ever use /home */}
-        <Route path="/home" element={<Home />} />
-
-        {/* Clinic finder + details */}
-        <Route path="/clinic-finder" element={<ClinicFinder />} />
-        <Route path="/clinics/:id" element={<ClinicDetails />} />
-
-        {/* Visit checklists */}
-        <Route path="/visit-guides/*" element={<VisitGuides />} />
-
-        {/* Reminders (profile + list of reminders) */}
-        <Route path="/reminders" element={<Reminders />} />
-
-        {/* Auth */}
+        {/* Public */}
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
-        {/* Admin (protected) */}
+        {/* Protected user routes */}
         <Route
-          path="/admin"
+          path="/clinic-finder"
           element={
-            <RequireAdmin>
-              <AdminDashboard />
-            </RequireAdmin>
+            <RequireAuth>
+              <ClinicFinder />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/clinics/:id"
+          element={
+            <RequireAuth>
+              <ClinicDetails />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/visit-guides/*"
+          element={
+            <RequireAuth>
+              <VisitGuides />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reminders"
+          element={
+            <RequireAuth>
+              <Reminders />
+            </RequireAuth>
           }
         />
 
-        {/* Catch-all: avoid blank screens on unknown paths */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Admin */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminDashboard />
+              </RequireAdmin>
+            </RequireAuth>
+          }
+        />
+
+        {/* Default */}
+        <Route path="/" element={<Navigate to="/clinic-finder" />} />
       </Routes>
     </div>
   );

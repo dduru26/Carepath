@@ -6,10 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate",
-    "prisma:seed": "prisma db seed"
+    "import:kigali": "node scripts/importKigaliClinics.js",
+    "seed:users": "node scripts/seedAdmin.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -19,15 +17,12 @@
     "axios": "^1.7.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^4.19.0",
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
     "prisma": "5.20.0"
-  },
-  "scripts": {
-    "dev": "nodemon src/index.js",
-    "import:kigali": "node scripts/importKigaliClinics.js"
   }
 }

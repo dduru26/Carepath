@@ -1,134 +1,130 @@
 // src/routes/auth.js
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../prismaClient');
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret';
+const router = express.Router();
 
-// Helper to generate a JWT
-function generateToken(user) {
-  return jwt.sign(
-    {
-      userId: user.id,
-      role: user.role,
-    },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_EXPIRES_IN = '7d';
+
+function toPublicUser(user) {
+  if (!user) return null;
+  const { passwordHash, ...rest } = user;
+  return rest;
 }
 
-/**
- * POST /auth/signup
- * Create a new user account (for now: email + phone + password)
- */
-router.post('/signup', async (req, res) => {
+// POST /api/auth/register
+router.post('/register', async (req, res) => {
   try {
-    const { email, phoneNumber, password, role, channel } = req.body;
+    const { email, phoneNumber, password, channel, language } = req.body;
 
-    if (!phoneNumber || !password) {
+    if (!email || !password) {
       return res
         .status(400)
-        .json({ error: 'phoneNumber and password are required' });
+        .json({ error: 'Email and password are required.' });
     }
 
-    // Check if user already exists
-    const existingByPhone = await prisma.user.findUnique({
-      where: { phoneNumber },
-    });
-
-    if (existingByPhone) {
-      return res
-        .status(409)
-        .json({ error: 'A user with this phone number already exists' });
-    }
-
-    if (email) {
-      const existingByEmail = await prisma.user.findUnique({
-        where: { email },
-      });
-      if (existingByEmail) {
-        return res
-          .status(409)
-          .json({ error: 'A user with this email already exists' });
-      }
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already in use.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
-        email: email || null,
-        phoneNumber,
+        email,
+        phoneNumber: phoneNumber || null,
         passwordHash,
-        role: role || 'patient', // later we can restrict roles
-        channel: channel || 'sms',
+        role: 'user',
+        channel: channel || 'SMS',
+        language: language || 'English',
       },
     });
 
-    const token = generateToken(user);
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
-    res.status(201).json({
+    res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-      },
+      user: toPublicUser(user),
     });
   } catch (err) {
-    console.error('Error in /auth/signup:', err);
-    res.status(500).json({ error: 'Unable to create account' });
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Failed to register user.' });
   }
 });
 
-/**
- * POST /auth/login
- * Log in by email or phone + password
- */
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, phoneNumber, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!password || (!email && !phoneNumber)) {
+    if (!email || !password) {
       return res
         .status(400)
-        .json({ error: 'Provide password and either email or phoneNumber' });
+        .json({ error: 'Email and password are required.' });
     }
 
-    let user = null;
-    if (email) {
-      user = await prisma.user.findUnique({ where: { email } });
-    } else if (phoneNumber) {
-      user = await prisma.user.findUnique({ where: { phoneNumber } });
-    }
-
-    if (!user || !user.passwordHash) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
-    const token = generateToken(user);
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        role: user.role,
-      },
+      user: toPublicUser(user),
     });
   } catch (err) {
-    console.error('Error in /auth/login:', err);
-    res.status(500).json({ error: 'Unable to log in' });
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Failed to login.' });
+  }
+});
+
+// GET /api/auth/me
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const [, token] = authHeader.split(' '); // "Bearer <token>"
+
+    if (!token) {
+      return res.status(401).json({ error: 'Missing token' });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    res.json({ user: toPublicUser(user) });
+  } catch (err) {
+    console.error('Me error:', err);
+    res.status(500).json({ error: 'Failed to verify session.' });
   }
 });
 

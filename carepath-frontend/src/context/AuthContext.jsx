@@ -1,97 +1,117 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
-import { setAuthToken } from '../api/client';
+import { createContext, useContext, useEffect, useState } from 'react';
+import api from '../api/client';
 
 const AuthContext = createContext(null);
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);   // { id, email, phoneNumber, role }
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [initialising, setInitialising] = useState(true);
+  const [authError, setAuthError] = useState('');
 
-  // Restore from localStorage on first load
+  // Restore session on first load
   useEffect(() => {
-    const savedToken = localStorage.getItem('carepath_token');
-    const savedUser = localStorage.getItem('carepath_user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setAuthToken(savedToken);
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        setUser(null);
-      }
+    const token = localStorage.getItem('carepath_token');
+    if (!token) {
+      setInitialising(false);
+      return;
     }
-    setLoading(false);
+
+    const restoreSession = async () => {
+      try {
+        setAuthError('');
+        const res = await api.get('/auth/me');
+        setUser(res.data.user);
+      } catch (err) {
+        console.error('Error restoring session:', err);
+        localStorage.removeItem('carepath_token');
+        setUser(null);
+      } finally {
+        setInitialising(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
-  const login = async ({ email, phoneNumber, password }) => {
-    const payload = { password };
-    if (email) payload.email = email;
-    if (phoneNumber) payload.phoneNumber = phoneNumber;
+  const login = async (email, password) => {
+    setAuthError('');
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      const { token, user: loggedInUser } = res.data;
 
-    const res = await axios.post('http://localhost:4000/auth/login', payload);
-    const { token: newToken, user: userData } = res.data;
-
-    setToken(newToken);
-    setUser(userData);
-
-    localStorage.setItem('carepath_token', newToken);
-    localStorage.setItem('carepath_user', JSON.stringify(userData));
-
-    setAuthToken(newToken);
-
-    return userData;
+      if (token) {
+        localStorage.setItem('carepath_token', token);
+      }
+      setUser(loggedInUser);
+      return loggedInUser;
+    } catch (err) {
+      console.error('Login failed:', err);
+      const msg =
+        err.response?.data?.error || 'Login failed. Please try again.';
+      setAuthError(msg);
+      throw err;
+    }
   };
 
-  const signup = async ({ email, phoneNumber, password, role, channel }) => {
-    const res = await axios.post('http://localhost:4000/auth/signup', {
-      email,
-      phoneNumber,
-      password,
-      role: role || 'patient',
-      channel: channel || 'sms',
-    });
+  const signup = async ({
+    email,
+    phoneNumber,
+    password,
+    channel,
+    language,
+  }) => {
+    setAuthError('');
+    try {
+      const payload = {
+        email,
+        phoneNumber: phoneNumber || '',
+        password,
+        channel: channel || 'SMS',
+        language: language || 'English',
+      };
 
-    const { token: newToken, user: userData } = res.data;
+      const res = await api.post('/auth/register', payload);
+      const { token, user: newUser } = res.data;
 
-    setToken(newToken);
-    setUser(userData);
-    localStorage.setItem('carepath_token', newToken);
-    localStorage.setItem('carepath_user', JSON.stringify(userData));
-    setAuthToken(newToken);
-
-    return userData;
+      if (token) {
+        localStorage.setItem('carepath_token', token);
+      }
+      setUser(newUser);
+      return newUser;
+    } catch (err) {
+      console.error('Signup failed:', err);
+      const msg =
+        err.response?.data?.error || 'Sign up failed. Please try again.';
+      setAuthError(msg);
+      throw err;
+    }
   };
 
   const logout = () => {
-    setToken(null);
-    setUser(null);
     localStorage.removeItem('carepath_token');
-    localStorage.removeItem('carepath_user');
-    setAuthToken(null);
+    setUser(null);
+    setAuthError('');
   };
+
+  const isAdmin = user?.role === 'admin';
+  const isChw = user?.role === 'chw';
 
   const value = {
     user,
-    token,
-    loading,
+    isAdmin,
+    isChw,
     login,
     signup,
     logout,
-    isAdmin: user?.role === 'admin',
-    isChw: user?.role === 'chw',
+    initialising,
+    authError,
+    setAuthError,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
 }
